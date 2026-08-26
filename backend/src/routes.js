@@ -1,0 +1,121 @@
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import { Router } from 'express';
+import { z } from 'zod';
+import XLSX from 'xlsx';
+import { Admin, Branch, Question, Report, TeamMember } from './models.js';
+import { clearSessionCookie, createSession, requireAdmin, requireCsrf, sessionCookie } from './middleware/auth.js';
+import { exportValue, makeQuestionKey, normaliseAnswer, PACE_OPTIONS } from './utils/normalise.js';
+
+const questionInputTypes = ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber'];
+const questionPayload = z.object({ label: z.string().trim().min(3).max(180), helpText: z.string().trim().max(300).optional().default(''), inputType: z.enum(questionInputTypes), options: z.array(z.union([z.string().trim().min(1).max(100), z.object({ label: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(100) })])).max(30).optional().default([]), required: z.boolean().optional().default(false), order: z.number().int().min(0).optional(), validation: z.object({ maxLength: z.number().int().positive().max(1000).optional() }).optional(), showWhen: z.object({ questionKey: z.string().trim(), equals: z.union([z.string(), z.boolean(), z.number()]) }).nullable().optional() });
+const branchPayload = z.object({ name: z.string().trim().min(2).max(100), code: z.string().trim().max(20).optional().default(''), isActive: z.boolean().optional().default(true) });
+const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
+
+function canonicalOptions(options) { return options.map((option) => typeof option === 'string' ? { label: option, value: option } : option); }
+function toPlainAnswers(report) { return Object.fromEntries(report.answers instanceof Map ? report.answers.entries() : Object.entries(report.answers || {})); }
+function dateToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()); }
+
+export const publicRouter = Router();
+publicRouter.get('/form', async (_req, res, next) => {
+  try {
+    const [branches, teamMembers, questions] = await Promise.all([
+      Branch.find({ isActive: true }).select('name code').sort({ name: 1 }).lean(),
+      TeamMember.find({ isActive: true }).select('fullName branchId').sort({ fullName: 1 }).lean(),
+      Question.find({ isActive: true }).sort({ order: 1, createdAt: 1 }).lean(),
+    ]);
+    res.json({ branches, teamMembers, questions });
+  } catch (error) { next(error); }
+});
+
+publicRouter.post('/reports', async (req, res, next) => {
+  try {
+    const reportDate = String(req.body.reportDate || '');
+    const branchId = String(req.body.branchId || '');
+    const teamMemberId = String(req.body.teamMemberId || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) return res.status(422).json({ message: 'Choose a valid report date.' });
+    const [branch, teamMember, questions] = await Promise.all([
+      Branch.findOne({ _id: branchId, isActive: true }),
+      TeamMember.findOne({ _id: teamMemberId, isActive: true }),
+      Question.find({ isActive: true }).sort({ order: 1, createdAt: 1 }).lean(),
+    ]);
+    if (!branch || !teamMember || teamMember.branchId.toString() !== branch._id.toString()) return res.status(422).json({ message: 'Select an active BDE/ESo from the selected branch.' });
+    const sourceAnswers = { ...req.body, ...(req.body.customAnswers || {}) };
+    const answers = {};
+    const errors = [];
+    for (const question of questions) {
+      const shouldShow = !question.showWhen || sourceAnswers[question.showWhen.questionKey] === question.showWhen.equals || (question.showWhen.equals === true && sourceAnswers[question.showWhen.questionKey] === 'Yes');
+      if (!shouldShow) continue;
+      const result = normaliseAnswer(question, sourceAnswers[question.key]);
+      if (question.required && (result.value === null || result.value === '')) errors.push(`${question.label} is required.`);
+      else if (result.error) errors.push(result.error);
+      else if (result.value !== null) answers[question.key] = result.value;
+    }
+    if (errors.length) return res.status(422).json({ message: errors[0], fieldErrors: errors });
+    const report = await Report.create({ reportDate, branchId: branch._id, branchName: branch.name, teamMemberId: teamMember._id, teamMemberName: teamMember.fullName, answers, questionSnapshot: questions.map(({ key, label, inputType }) => ({ key, label, inputType })) });
+    return res.status(201).json({ report: { ...report.toObject(), answers: toPlainAnswers(report) } });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ message: 'This BDE/ESo has already submitted a report for that date.' });
+    return next(error);
+  }
+});
+
+export const authRouter = Router();
+authRouter.post('/login', async (req, res, next) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const admin = await Admin.findOne({ email, isActive: true });
+    if (!admin || !(await bcrypt.compare(password, admin.passwordHash))) return res.status(401).json({ message: 'The email or password is not recognised.' });
+    const { token, csrfToken } = createSession(admin);
+    sessionCookie(res, token);
+    return res.json({ admin: { id: admin._id, displayName: admin.displayName, email: admin.email }, csrfToken });
+  } catch (error) { return next(error); }
+});
+authRouter.post('/logout', requireAdmin, requireCsrf, (_req, res) => { clearSessionCookie(res); res.json({ success: true }); });
+authRouter.get('/me', requireAdmin, async (req, res, next) => { try { const admin = await Admin.findById(req.admin.sub).select('displayName email isActive').lean(); if (!admin?.isActive) return res.status(401).json({ message: 'This administrator is no longer active.' }); return res.json({ admin }); } catch (error) { return next(error); } });
+
+export const adminRouter = Router();
+adminRouter.use(requireAdmin);
+adminRouter.get('/dashboard', async (_req, res, next) => {
+  try {
+    const today = dateToday();
+    const [todayReports, activeBranches, latestReports] = await Promise.all([Report.find({ reportDate: today }).lean(), Branch.countDocuments({ isActive: true }), Report.find().sort({ reportDate: -1, createdAt: -1 }).limit(8).lean()]);
+    const summary = todayReports.reduce((result, report) => { const answers = toPlainAnswers(report); result.accountsOpened += Number(answers.accountsOpened || 0); result.amountMobilised += Number(answers.amountMobilised || 0); return result; }, { submittedToday: todayReports.length, accountsOpened: 0, amountMobilised: 0, activeBranches });
+    res.json({ summary, latestReports: latestReports.map((report) => ({ ...report, answers: toPlainAnswers(report) })) });
+  } catch (error) { next(error); }
+});
+adminRouter.get('/questions', async (_req, res, next) => { try { res.json({ questions: await Question.find().sort({ order: 1, createdAt: 1 }).lean() }); } catch (error) { next(error); } });
+adminRouter.post('/questions', requireCsrf, async (req, res, next) => {
+  try { const payload = questionPayload.parse(req.body); if (payload.inputType === 'select' && !payload.options.length) return res.status(422).json({ message: 'A select list needs at least one option.' }); const question = await Question.create({ ...payload, options: canonicalOptions(payload.options), key: makeQuestionKey(payload.label), order: payload.order ?? await Question.countDocuments() }); res.status(201).json({ question }); } catch (error) { next(error); }
+});
+adminRouter.put('/questions/:id', requireCsrf, async (req, res, next) => { try { const payload = questionPayload.parse(req.body); if (payload.inputType === 'select' && !payload.options.length) return res.status(422).json({ message: 'A select list needs at least one option.' }); const question = await Question.findByIdAndUpdate(req.params.id, { ...payload, options: canonicalOptions(payload.options) }, { new: true, runValidators: true }); if (!question) return res.status(404).json({ message: 'Question not found.' }); return res.json({ question }); } catch (error) { return next(error); } });
+adminRouter.delete('/questions/:id', requireCsrf, async (req, res, next) => { try { const question = await Question.findById(req.params.id); if (!question) return res.status(404).json({ message: 'Question not found.' }); const existsInReport = await Report.exists({ 'questionSnapshot.key': question.key }); if (existsInReport) { question.isActive = false; await question.save(); return res.json({ retired: true }); } await question.deleteOne(); return res.json({ deleted: true }); } catch (error) { return next(error); } });
+
+adminRouter.get('/branches', async (_req, res, next) => { try { res.json({ branches: await Branch.find().sort({ name: 1 }).lean() }); } catch (error) { next(error); } });
+adminRouter.post('/branches', requireCsrf, async (req, res, next) => { try { const branch = await Branch.create(branchPayload.parse(req.body)); res.status(201).json({ branch }); } catch (error) { next(error); } });
+adminRouter.put('/branches/:id', requireCsrf, async (req, res, next) => { try { const branch = await Branch.findByIdAndUpdate(req.params.id, branchPayload.parse(req.body), { new: true, runValidators: true }); if (!branch) return res.status(404).json({ message: 'Branch not found.' }); res.json({ branch }); } catch (error) { next(error); } });
+adminRouter.get('/team-members', async (_req, res, next) => { try { res.json({ teamMembers: await TeamMember.find().sort({ fullName: 1 }).lean() }); } catch (error) { next(error); } });
+adminRouter.post('/team-members', requireCsrf, async (req, res, next) => { try { const member = await TeamMember.create(memberPayload.parse(req.body)); res.status(201).json({ member }); } catch (error) { next(error); } });
+adminRouter.put('/team-members/:id', requireCsrf, async (req, res, next) => { try { const member = await TeamMember.findByIdAndUpdate(req.params.id, memberPayload.parse(req.body), { new: true, runValidators: true }); if (!member) return res.status(404).json({ message: 'Team member not found.' }); res.json({ member }); } catch (error) { next(error); } });
+
+function buildReportFilter(query) { const filter = {}; if (/^\d{4}-\d{2}-\d{2}$/.test(query.from)) filter.reportDate = { ...(filter.reportDate || {}), $gte: query.from }; if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) filter.reportDate = { ...(filter.reportDate || {}), $lte: query.to }; if (query.search?.trim()) { const regex = new RegExp(query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); filter.$or = [{ teamMemberName: regex }, { branchName: regex }]; } return filter; }
+async function queriedReports(query) { return Report.find(buildReportFilter(query)).sort({ reportDate: -1, createdAt: -1 }).lean(); }
+adminRouter.get('/reports', async (req, res, next) => { try { const reports = await queriedReports(req.query); res.json({ reports: reports.map((report) => ({ ...report, answers: toPlainAnswers(report) })) }); } catch (error) { next(error); } });
+adminRouter.get('/reports/export', async (req, res, next) => {
+  try {
+    const reports = await queriedReports(req.query);
+    const labels = new Map(); reports.forEach((report) => report.questionSnapshot.forEach((question) => labels.set(question.key, question)));
+    const rows = reports.map((report) => { const answers = toPlainAnswers(report); const row = { 'Report date': report.reportDate, Branch: report.branchName, 'BDE / ESo': report.teamMemberName, 'Submitted at': report.createdAt?.toISOString?.() || '' }; labels.forEach((question, key) => { row[question.label] = exportValue(question, answers[key]); }); return row; });
+    const format = req.query.format === 'xlsx' ? 'xlsx' : 'csv';
+    const fileName = `bdelog-reports-${dateToday()}.${format}`;
+    if (format === 'csv') { const worksheet = XLSX.utils.json_to_sheet(rows); const output = XLSX.utils.sheet_to_csv(worksheet); res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.attachment(fileName); return res.send(`\uFEFF${output}`); }
+    const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'BDELog reports'); const output = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }); res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.attachment(fileName); return res.send(output);
+  } catch (error) { return next(error); }
+});
+
+export function appErrorHandler(error, _req, res, _next) {
+  if (error instanceof z.ZodError) return res.status(422).json({ message: error.issues[0]?.message || 'The input is not valid.' });
+  if (error?.code === 11000) return res.status(409).json({ message: 'That value already exists in BDELog.' });
+  console.error(error); return res.status(500).json({ message: 'An unexpected error occurred. Please try again.' });
+}
