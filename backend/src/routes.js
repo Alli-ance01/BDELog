@@ -9,7 +9,7 @@ import { exportValue, makeQuestionKey, normaliseAnswer } from './utils/normalise
 const questionInputTypes = ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber'];
 const questionPayload = z.object({ label: z.string().trim().min(3).max(180), helpText: z.string().trim().max(300).optional().default(''), inputType: z.enum(questionInputTypes), options: z.array(z.union([z.string().trim().min(1).max(100), z.object({ label: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(100) })])).max(30).optional().default([]), required: z.boolean().optional().default(false), order: z.number().int().min(0).optional(), validation: z.object({ maxLength: z.number().int().positive().max(1000).optional() }).optional(), showWhen: z.object({ questionKey: z.string().trim(), equals: z.union([z.string(), z.boolean(), z.number()]) }).nullable().optional() });
 const branchPayload = z.object({ name: z.string().trim().min(2).max(100), code: z.string().trim().max(20).optional().default(''), isActive: z.boolean().optional().default(true) });
-const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
+const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'DSO']), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
 const adminCreatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254), password: z.string().min(12).max(128) });
 const adminUpdatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254) });
 const passwordResetPayload = z.object({ password: z.string().min(12).max(128) });
@@ -43,7 +43,7 @@ publicRouter.post('/reports', async (req, res, next) => {
       TeamMember.findOne({ _id: teamMemberId, isActive: true }),
       Question.find({ isActive: true }).sort({ order: 1, createdAt: 1 }).lean(),
     ]);
-    if (!branch || !teamMember || teamMember.branchId.toString() !== branch._id.toString()) return res.status(422).json({ message: 'Select an active BDE/ESo from the selected branch.' });
+    if (!branch || !teamMember || teamMember.branchId.toString() !== branch._id.toString()) return res.status(422).json({ message: 'Select an active BDE/DSO from the selected branch.' });
     const sourceAnswers = { ...req.body, ...(req.body.customAnswers || {}) };
     const answers = {};
     const errors = [];
@@ -59,7 +59,7 @@ publicRouter.post('/reports', async (req, res, next) => {
       const accountNumbers = answers.accountNumber || [];
       if (Number.isSafeInteger(accountsOpened) && accountsOpened !== accountNumbers.length) errors.push(`Add ${accountsOpened} account number${accountsOpened === 1 ? '' : 's'} to match accounts opened today.`);
       if (errors.length) return res.status(422).json({ message: errors[0], fieldErrors: errors });
-    const report = await Report.create({ reportDate, branchId: branch._id, branchName: branch.name, teamMemberId: teamMember._id, teamMemberName: teamMember.fullName, answers, questionSnapshot: questions.map(({ key, label, inputType }) => ({ key, label, inputType })) });
+    const report = await Report.create({ reportDate, branchId: branch._id, branchName: branch.name, teamMemberId: teamMember._id, teamMemberName: teamMember.fullName, teamMemberDaoCode: teamMember.daoCode || '', teamMemberRole: teamMember.role || 'BDE', answers, questionSnapshot: questions.map(({ key, label, inputType }) => ({ key, label, inputType })) });
     return res.status(201).json({ report: { ...report.toObject(), answers: toPlainAnswers(report) } });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ message: 'This BDE/ESo has already submitted a report for that date.' });
@@ -108,8 +108,8 @@ adminRouter.get('/branches', async (_req, res, next) => { try { res.json({ branc
 adminRouter.post('/branches', requireCsrf, async (req, res, next) => { try { const payload = normaliseBranchPayload(branchPayload.parse(req.body)); const branch = await Branch.create(payload); res.status(201).json({ branch }); } catch (error) { next(error); } });
 adminRouter.put('/branches/:id', requireCsrf, async (req, res, next) => { try { const payload = normaliseBranchPayload(branchPayload.parse(req.body)); const update = payload.code ? { $set: payload } : { $set: { name: payload.name, isActive: payload.isActive }, $unset: { code: 1 } }; const branch = await Branch.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true }); if (!branch) return res.status(404).json({ message: 'Branch not found.' }); res.json({ branch }); } catch (error) { next(error); } });
 adminRouter.get('/team-members', async (_req, res, next) => { try { res.json({ teamMembers: await TeamMember.find().sort({ fullName: 1 }).lean() }); } catch (error) { next(error); } });
-adminRouter.post('/team-members', requireCsrf, async (req, res, next) => { try { const member = await TeamMember.create(memberPayload.parse(req.body)); res.status(201).json({ member }); } catch (error) { next(error); } });
-adminRouter.put('/team-members/:id', requireCsrf, async (req, res, next) => { try { const member = await TeamMember.findByIdAndUpdate(req.params.id, memberPayload.parse(req.body), { new: true, runValidators: true }); if (!member) return res.status(404).json({ message: 'Team member not found.' }); res.json({ member }); } catch (error) { next(error); } });
+adminRouter.post('/team-members', requireCsrf, async (req, res, next) => { try { const payload = memberPayload.parse(req.body); const member = await TeamMember.create({ ...payload, daoCode: payload.daoCode.toUpperCase() }); res.status(201).json({ member }); } catch (error) { next(error); } });
+adminRouter.put('/team-members/:id', requireCsrf, async (req, res, next) => { try { const payload = memberPayload.parse(req.body); const member = await TeamMember.findByIdAndUpdate(req.params.id, { ...payload, daoCode: payload.daoCode.toUpperCase() }, { new: true, runValidators: true }); if (!member) return res.status(404).json({ message: 'Team member not found.' }); res.json({ member }); } catch (error) { next(error); } });
 
 function buildReportFilter(query) { const filter = {}; if (/^\d{4}-\d{2}-\d{2}$/.test(query.from)) filter.reportDate = { ...(filter.reportDate || {}), $gte: query.from }; if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) filter.reportDate = { ...(filter.reportDate || {}), $lte: query.to }; if (query.search?.trim()) { const regex = new RegExp(query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); filter.$or = [{ teamMemberName: regex }, { branchName: regex }]; } return filter; }
 async function queriedReports(query) { return Report.find(buildReportFilter(query)).sort({ reportDate: -1, createdAt: -1 }).lean(); }
@@ -118,7 +118,7 @@ adminRouter.get('/reports/export', async (req, res, next) => {
   try {
     const reports = await queriedReports(req.query);
     const labels = new Map(); reports.forEach((report) => report.questionSnapshot.forEach((question) => labels.set(question.key, question)));
-    const rows = reports.map((report) => { const answers = toPlainAnswers(report); const row = { 'Report date': report.reportDate, Branch: report.branchName, 'BDE / ESo': report.teamMemberName, 'Submitted at': report.createdAt?.toISOString?.() || '' }; labels.forEach((question, key) => { row[question.label] = exportValue(question, answers[key]); }); return row; });
+    const rows = reports.map((report) => { const answers = toPlainAnswers(report); const row = { 'Report date': report.reportDate, Branch: report.branchName, Name: report.teamMemberName, 'DAO code': report.teamMemberDaoCode || '', Role: report.teamMemberRole || '', 'Submitted at': report.createdAt?.toISOString?.() || '' }; labels.forEach((question, key) => { row[question.label] = exportValue(question, answers[key]); }); return row; });
     const format = req.query.format === 'xlsx' ? 'xlsx' : 'csv';
     const fileName = `bdelog-reports-${dateToday()}.${format}`;
     if (format === 'csv') { const worksheet = XLSX.utils.json_to_sheet(rows); const output = XLSX.utils.sheet_to_csv(worksheet); res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.attachment(fileName); return res.send(`\uFEFF${output}`); }
@@ -128,6 +128,6 @@ adminRouter.get('/reports/export', async (req, res, next) => {
 
 export function appErrorHandler(error, _req, res, _next) {
   if (error instanceof z.ZodError) return res.status(422).json({ message: error.issues[0]?.message || 'The input is not valid.' });
-  if (error?.code === 11000) { const field = Object.keys(error.keyPattern || {})[0]; const messages = { name: 'A branch with that name already exists.', code: 'That branch code is already in use.', email: 'An administrator with that email already exists.' }; return res.status(409).json({ message: messages[field] || 'That value already exists in BDELog.' }); }
+  if (error?.code === 11000) { const field = Object.keys(error.keyPattern || {})[0]; const messages = { name: 'A branch with that name already exists.', code: 'That branch code is already in use.', email: 'An administrator with that email already exists.', daoCode: 'That DAO code is already assigned to a team member.' }; return res.status(409).json({ message: messages[field] || 'That value already exists in BDELog.' }); }
   console.error(error); return res.status(500).json({ message: 'An unexpected error occurred. Please try again.' });
 }

@@ -16,7 +16,7 @@ export default function QuestionBuilder() {
   const [teamMembers, setTeamMembers] = useState([]);
   const [draft, setDraft] = useState(null);
   const [branchDraft, setBranchDraft] = useState({ name: '', code: '' });
-  const [memberDraft, setMemberDraft] = useState({ fullName: '', branchId: '' });
+  const [memberDraft, setMemberDraft] = useState({ fullName: '', daoCode: '', role: 'BDE', branchId: '' });
 
   useEffect(() => {
     Promise.all([api('/admin/questions'), api('/admin/branches'), api('/admin/team-members')])
@@ -47,7 +47,7 @@ export default function QuestionBuilder() {
 
   async function addMember(event) {
     event.preventDefault();
-    try { const result = await api('/admin/team-members', { method: 'POST', body: JSON.stringify(memberDraft) }); setTeamMembers((current) => [...current, result.member].sort((a, b) => a.fullName.localeCompare(b.fullName))); setMemberDraft({ fullName: '', branchId: '' }); toast.success('BDE/ESo added to the canonical list.'); } catch (error) { toast.error(error.message); }
+    try { const result = await api('/admin/team-members', { method: 'POST', body: JSON.stringify(memberDraft) }); setTeamMembers((current) => [...current, result.member].sort((a, b) => a.fullName.localeCompare(b.fullName))); setMemberDraft({ fullName: '', daoCode: '', role: 'BDE', branchId: '' }); toast.success('BDE/DSO added to the managed directory.'); } catch (error) { toast.error(error.message); }
   }
 
   return (
@@ -58,10 +58,10 @@ export default function QuestionBuilder() {
         <section className="studio-intro"><SlidersHorizontal size={18} /><p>Every question has a defined type. Counts, amounts, options, and dates remain consistent before they reach Excel.</p></section>
 
         <section className="directory-section">
-          <div className="directory-heading"><p className="eyebrow">CANONICAL IDENTITY DIRECTORY</p><h2>Branches and BDE / ESo names</h2><p>These managed choices replace free-text identity fields, so every report groups cleanly by branch and team member.</p></div>
+          <div className="directory-heading"><p className="eyebrow">CANONICAL IDENTITY DIRECTORY</p><h2>Branches and BDE / DSO names</h2><p>These managed choices replace free-text identity fields. DAO codes and roles stay out of the worker form but are carried into every export.</p></div>
           <div className="directory-grid">
             <form className="directory-panel" onSubmit={addBranch}><div className="directory-panel__header"><span>01</span><h3>Branch list</h3></div><div className="inline-form"><input aria-label="Branch name" placeholder="Branch name" value={branchDraft.name} onChange={(event) => setBranchDraft({ ...branchDraft, name: event.target.value })} required /><input aria-label="Branch code" placeholder="Code (optional)" value={branchDraft.code} onChange={(event) => setBranchDraft({ ...branchDraft, code: event.target.value })} /><button className="primary-button" type="submit"><Plus size={15} /> Add</button></div><div className="directory-panel__list">{branches.length ? branches.map((branch) => <span key={branch._id}>{branch.name}{branch.code ? <small>{branch.code}</small> : null}</span>) : <em>Add the branches in your region.</em>}</div></form>
-            <form className="directory-panel" onSubmit={addMember}><div className="directory-panel__header"><span>02</span><h3>BDE / ESo list</h3></div><div className="inline-form inline-form--member"><input aria-label="BDE or ESo name" placeholder="Full name" value={memberDraft.fullName} onChange={(event) => setMemberDraft({ ...memberDraft, fullName: event.target.value })} required /><select aria-label="Branch" value={memberDraft.branchId} onChange={(event) => setMemberDraft({ ...memberDraft, branchId: event.target.value })} required><option value="">Select branch</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select><button className="primary-button" type="submit" disabled={!branches.length}><UserPlus size={15} /> Add</button></div><div className="directory-panel__list">{teamMembers.length ? teamMembers.map((member) => <span key={member._id}>{member.fullName}<small>{branches.find((branch) => branch._id === member.branchId)?.name || 'Assigned branch'}</small></span>) : <em>Add each BDE / ESo to their branch.</em>}</div></form>
+            <form className="directory-panel" onSubmit={addMember}><div className="directory-panel__header"><span>02</span><h3>BDE / DSO list</h3></div><div className="member-directory-form"><input aria-label="BDE or DSO name" placeholder="Full name" value={memberDraft.fullName} onChange={(event) => setMemberDraft({ ...memberDraft, fullName: event.target.value })} required /><input aria-label="DAO code" placeholder="DAO code" value={memberDraft.daoCode} onChange={(event) => setMemberDraft({ ...memberDraft, daoCode: event.target.value.toUpperCase() })} required /><select aria-label="Branch" value={memberDraft.branchId} onChange={(event) => setMemberDraft({ ...memberDraft, branchId: event.target.value })} required><option value="">Select branch</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select><select aria-label="Role" value={memberDraft.role} onChange={(event) => setMemberDraft({ ...memberDraft, role: event.target.value })}><option value="BDE">BDE</option><option value="DSO">DSO</option></select><button className="primary-button" type="submit" disabled={!branches.length}><UserPlus size={15} /> Add</button></div><div className="directory-panel__list">{teamMembers.length ? teamMembers.map((member) => <span key={member._id}>{member.fullName}<small>{member.daoCode || 'DAO pending'} · {member.role || 'BDE'} · {branches.find((branch) => branch._id === member.branchId)?.name || 'Assigned branch'}</small></span>) : <em>Add each BDE / DSO to their branch.</em>}</div></form>
           </div>
         </section>
 

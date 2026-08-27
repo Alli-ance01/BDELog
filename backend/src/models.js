@@ -18,6 +18,8 @@ const branchSchema = new Schema({
 
 const teamMemberSchema = new Schema({
   fullName: { type: String, required: true, trim: true, maxlength: 120 },
+  daoCode: { type: String, trim: true, uppercase: true, maxlength: 50, unique: true, sparse: true },
+  role: { type: String, enum: ['BDE', 'DSO'], default: 'BDE' },
   branchId: { type: Schema.Types.ObjectId, ref: 'Branch', required: true },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
@@ -47,6 +49,8 @@ const reportSchema = new Schema({
   branchName: { type: String, required: true },
   teamMemberId: { type: Schema.Types.ObjectId, ref: 'TeamMember', required: true },
   teamMemberName: { type: String, required: true },
+  teamMemberDaoCode: { type: String, default: '' },
+  teamMemberRole: { type: String, enum: ['BDE', 'DSO'], default: 'BDE' },
   answers: { type: Map, of: Schema.Types.Mixed, default: {} },
   questionSnapshot: { type: [answerSnapshotSchema], default: [] },
 }, { timestamps: true });

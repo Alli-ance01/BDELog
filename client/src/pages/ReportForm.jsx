@@ -92,8 +92,8 @@ export default function ReportForm() {
   function addAccountNumbers(rawValue = accountNumberEntry) {
     const candidates = String(rawValue).split(/[\s,;]+/).map((value) => value.replace(/\D/g, '')).filter(Boolean);
     if (!candidates.length) return;
-    const invalid = candidates.find((value) => value.length < 4 || value.length > 32);
-    if (invalid) { toast.error('Each account number must contain 4–32 digits.'); return; }
+    const invalid = candidates.find((value) => value.length !== 10);
+    if (invalid) { toast.error('Each account number must contain exactly 10 digits.'); return; }
     const duplicate = candidates.find((value) => form.accountNumber.includes(value));
     if (duplicate) { toast.error(`${duplicate} is already in this report.`); setAccountNumberEntry(''); return; }
     const uniqueValues = [...new Set(candidates)];
@@ -190,7 +190,7 @@ export default function ReportForm() {
                   <ChevronDown size={17} />
                 </div>
               </Field>
-              <Field label="BDE / ESo name">
+              <Field label="BDE / DSO name">
                 <div className="select-wrap">
                   <select value={form.teamMemberId} onChange={(event) => update('teamMemberId', event.target.value)} required disabled={!membersForBranch.length}>
                     <option value="">Select team member</option>
@@ -214,10 +214,10 @@ export default function ReportForm() {
               <Field label="Amount mobilised today" hint={moneyPreview(form.amountMobilised) || 'Enter an amount in Naira'}>
                 <input type="text" inputMode="decimal" placeholder="e.g. ₦250,000" value={form.amountMobilised} onChange={(event) => update('amountMobilised', event.target.value)} required aria-invalid={Boolean(form.amountMobilised && parseNaira(form.amountMobilised) === null)} />
               </Field>
-              <Field label="Account numbers opened today" hint="Enter one number at a time, then press Enter or Add. You may also paste a comma- or line-separated list. Leading zeros are preserved." className="field--full">
+              <Field label="Account numbers opened today" hint="Enter one 10-digit number at a time, then press Enter or Add. You may also paste a comma- or line-separated list. Leading zeros are preserved." className="field--full">
                 <div className="account-ledger-input">
                   <div className="account-ledger-input__entry">
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength="512" placeholder="Enter account number" value={accountNumberEntry} onChange={(event) => setAccountNumberEntry(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addAccountNumbers(); } }} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength="512" placeholder="Enter 10-digit account number" value={accountNumberEntry} onChange={(event) => setAccountNumberEntry(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addAccountNumbers(); } }} />
                     <button className="secondary-button" type="button" onClick={() => addAccountNumbers()} disabled={!accountNumberEntry.trim()}><Plus size={15} /> Add</button>
                   </div>
                   {form.accountNumber.length > 0 && <div className="account-ledger-tags" aria-label="Account numbers entered for today">{form.accountNumber.map((accountNumber) => <span key={accountNumber}>{accountNumber}<button type="button" aria-label={`Remove account number ${accountNumber}`} onClick={() => removeAccountNumber(accountNumber)}><X size={13} /></button></span>)}</div>}
@@ -264,7 +264,7 @@ export default function ReportForm() {
                 if (question.inputType === 'currency') return <Field key={question.key} label={question.label} hint={moneyPreview(value) || question.helpText || 'Enter a Naira amount'}><input type="text" inputMode="decimal" placeholder="e.g. ₦250,000 or 1m" value={value} onChange={(event) => updateCustom(question.key, event.target.value)} required={required} /></Field>;
                 if (question.inputType === 'integer') return <Field key={question.key} label={question.label} hint={question.helpText || 'Whole number only'}><input type="number" min="0" step="1" inputMode="numeric" value={value} onChange={(event) => updateCustom(question.key, event.target.value)} required={required} /></Field>;
                 if (question.inputType === 'date') return <Field key={question.key} label={question.label} hint={question.helpText}><input type="date" value={value} onChange={(event) => updateCustom(question.key, event.target.value)} required={required} /></Field>;
-                if (question.inputType === 'accountNumber') return <Field key={question.key} label={question.label} hint={question.helpText || 'Leading zeros are preserved'}><input type="text" inputMode="numeric" pattern="[0-9]*" maxLength="32" value={value} onChange={(event) => updateCustom(question.key, event.target.value.replace(/\D/g, ''))} required={required} /></Field>;
+                if (question.inputType === 'accountNumber') return <Field key={question.key} label={question.label} hint={question.helpText || 'Exactly 10 digits; leading zeros are preserved'}><input type="text" inputMode="numeric" pattern="[0-9]*" maxLength="10" value={value} onChange={(event) => updateCustom(question.key, event.target.value.replace(/\D/g, ''))} required={required} /></Field>;
                 return <Field key={question.key} label={question.label} hint={question.helpText}><input type="text" maxLength={question.validation?.maxLength || 180} value={value} onChange={(event) => updateCustom(question.key, event.target.value)} required={required} /></Field>;
               })}
             </LedgerSection>}

@@ -37,7 +37,7 @@ export function normaliseAnswer(question, value) {
   if (question.inputType === 'accountNumber') {
     const rawValues = Array.isArray(value) ? value : [value];
     const result = rawValues.map((item) => String(item).replace(/\s/g, ''));
-    if (result.some((item) => !/^\d{4,32}$/.test(item))) return { error: `Each ${question.label.toLowerCase()} must contain 4–32 digits.` };
+    if (result.some((item) => !/^\d{10}$/.test(item))) return { error: 'Each account number must contain exactly 10 digits.' };
     if (new Set(result).size !== result.length) return { error: 'Each account number can be entered only once per report.' };
     return { value: result };
   }
