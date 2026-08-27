@@ -16,6 +16,7 @@ const passwordResetPayload = z.object({ password: z.string().min(12).max(128) })
 const adminStatusPayload = z.object({ isActive: z.boolean() });
 
 function canonicalOptions(options) { return options.map((option) => typeof option === 'string' ? { label: option, value: option } : option); }
+function normaliseBranchPayload(payload) { return { ...payload, code: payload.code ? payload.code.trim().toUpperCase() : undefined }; }
 function toPlainAnswers(report) { return Object.fromEntries(report.answers instanceof Map ? report.answers.entries() : Object.entries(report.answers || {})); }
 function dateToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()); }
 
@@ -101,8 +102,8 @@ adminRouter.put('/questions/:id', requireCsrf, async (req, res, next) => { try {
 adminRouter.delete('/questions/:id', requireCsrf, async (req, res, next) => { try { const question = await Question.findById(req.params.id); if (!question) return res.status(404).json({ message: 'Question not found.' }); const existsInReport = await Report.exists({ 'questionSnapshot.key': question.key }); if (existsInReport) { question.isActive = false; await question.save(); return res.json({ retired: true }); } await question.deleteOne(); return res.json({ deleted: true }); } catch (error) { return next(error); } });
 
 adminRouter.get('/branches', async (_req, res, next) => { try { res.json({ branches: await Branch.find().sort({ name: 1 }).lean() }); } catch (error) { next(error); } });
-adminRouter.post('/branches', requireCsrf, async (req, res, next) => { try { const branch = await Branch.create(branchPayload.parse(req.body)); res.status(201).json({ branch }); } catch (error) { next(error); } });
-adminRouter.put('/branches/:id', requireCsrf, async (req, res, next) => { try { const branch = await Branch.findByIdAndUpdate(req.params.id, branchPayload.parse(req.body), { new: true, runValidators: true }); if (!branch) return res.status(404).json({ message: 'Branch not found.' }); res.json({ branch }); } catch (error) { next(error); } });
+adminRouter.post('/branches', requireCsrf, async (req, res, next) => { try { const payload = normaliseBranchPayload(branchPayload.parse(req.body)); const branch = await Branch.create(payload); res.status(201).json({ branch }); } catch (error) { next(error); } });
+adminRouter.put('/branches/:id', requireCsrf, async (req, res, next) => { try { const payload = normaliseBranchPayload(branchPayload.parse(req.body)); const update = payload.code ? { $set: payload } : { $set: { name: payload.name, isActive: payload.isActive }, $unset: { code: 1 } }; const branch = await Branch.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true }); if (!branch) return res.status(404).json({ message: 'Branch not found.' }); res.json({ branch }); } catch (error) { next(error); } });
 adminRouter.get('/team-members', async (_req, res, next) => { try { res.json({ teamMembers: await TeamMember.find().sort({ fullName: 1 }).lean() }); } catch (error) { next(error); } });
 adminRouter.post('/team-members', requireCsrf, async (req, res, next) => { try { const member = await TeamMember.create(memberPayload.parse(req.body)); res.status(201).json({ member }); } catch (error) { next(error); } });
 adminRouter.put('/team-members/:id', requireCsrf, async (req, res, next) => { try { const member = await TeamMember.findByIdAndUpdate(req.params.id, memberPayload.parse(req.body), { new: true, runValidators: true }); if (!member) return res.status(404).json({ message: 'Team member not found.' }); res.json({ member }); } catch (error) { next(error); } });
@@ -124,6 +125,6 @@ adminRouter.get('/reports/export', async (req, res, next) => {
 
 export function appErrorHandler(error, _req, res, _next) {
   if (error instanceof z.ZodError) return res.status(422).json({ message: error.issues[0]?.message || 'The input is not valid.' });
-  if (error?.code === 11000) return res.status(409).json({ message: 'That value already exists in BDELog.' });
+  if (error?.code === 11000) { const field = Object.keys(error.keyPattern || {})[0]; const messages = { name: 'A branch with that name already exists.', code: 'That branch code is already in use.', email: 'An administrator with that email already exists.' }; return res.status(409).json({ message: messages[field] || 'That value already exists in BDELog.' }); }
   console.error(error); return res.status(500).json({ message: 'An unexpected error occurred. Please try again.' });
 }
