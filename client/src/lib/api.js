@@ -20,16 +20,28 @@ export async function api(path, options = {}) {
   if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   if (!['GET', 'HEAD'].includes(method.toUpperCase())) headers['x-bdelog-csrf'] = getCsrfToken();
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    method,
-    headers,
-    credentials: 'include',
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      method,
+      headers,
+      credentials: 'include',
+    });
+  } catch (_error) {
+    throw new Error('Cannot reach BDELog right now. Check your connection, then refresh and try again.');
+  }
 
   const contentType = response.headers.get('content-type') || '';
   const data = contentType.includes('application/json') ? await response.json() : null;
-  if (!response.ok) throw new Error(data?.message || 'The request could not be completed.');
+  if (!response.ok) {
+    const recoveryMessage = response.status === 401 ? 'Your admin session has expired. Sign in again to continue.'
+      : response.status === 403 ? 'You do not have permission to make this change.'
+        : response.status === 404 ? 'That record is no longer available. Refresh the page and try again.'
+          : response.status >= 500 ? 'BDELog could not complete that change. Wait a moment, then try again.'
+            : null;
+    throw new Error(data?.message || recoveryMessage || 'The change could not be completed. Please review the fields and try again.');
+  }
   return data;
 }
 
