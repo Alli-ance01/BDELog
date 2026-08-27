@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
 import XLSX from 'xlsx';
-import { Admin, Branch, Question, Report, TeamMember } from './models.js';
+import { Admin, Branch, DirectoryRequest, Question, Report, TeamMember } from './models.js';
 import { clearSessionCookie, createSession, requireAdmin, requireCsrf, requireOwner, sessionCookie } from './middleware/auth.js';
 import { exportValue, makeQuestionKey, normaliseAnswer } from './utils/normalise.js';
 
@@ -10,6 +10,8 @@ const questionInputTypes = ['text', 'textarea', 'integer', 'currency', 'date', '
 const questionPayload = z.object({ label: z.string().trim().min(3).max(180), helpText: z.string().trim().max(300).optional().default(''), inputType: z.enum(questionInputTypes), options: z.array(z.union([z.string().trim().min(1).max(100), z.object({ label: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(100) })])).max(30).optional().default([]), required: z.boolean().optional().default(false), order: z.number().int().min(0).optional(), validation: z.object({ maxLength: z.number().int().positive().max(1000).optional() }).optional(), showWhen: z.object({ questionKey: z.string().trim(), equals: z.union([z.string(), z.boolean(), z.number()]) }).nullable().optional() });
 const branchPayload = z.object({ name: z.string().trim().min(2).max(100), code: z.string().trim().max(20).optional().default(''), isActive: z.boolean().optional().default(true) });
 const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'DSO']), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
+const directoryRequestPayload = z.object({ fullName: z.string().trim().min(3).max(120), branchName: z.string().trim().min(2).max(100), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'DSO']) });
+const directoryRequestStatusPayload = z.object({ status: z.enum(['reviewed', 'dismissed']) });
 const adminCreatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254), password: z.string().min(12).max(128) });
 const adminUpdatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254) });
 const passwordResetPayload = z.object({ password: z.string().min(12).max(128) });
@@ -30,6 +32,17 @@ publicRouter.get('/form', async (_req, res, next) => {
     ]);
     res.json({ branches, teamMembers, questions });
   } catch (error) { next(error); }
+});
+
+publicRouter.post('/directory-requests', async (req, res, next) => {
+  try {
+    const payload = directoryRequestPayload.parse(req.body);
+    const daoCode = payload.daoCode.toUpperCase();
+    const existingMember = await TeamMember.exists({ daoCode });
+    if (existingMember) return res.status(409).json({ message: 'This DAO code is already in the BDELog directory.' });
+    const request = await DirectoryRequest.create({ ...payload, daoCode });
+    return res.status(201).json({ request: { id: request._id, status: request.status } });
+  } catch (error) { return next(error); }
 });
 
 publicRouter.post('/reports', async (req, res, next) => {
@@ -55,9 +68,6 @@ publicRouter.post('/reports', async (req, res, next) => {
       else if (result.error) errors.push(result.error);
         else if (result.value !== null) answers[question.key] = result.value;
       }
-      const accountsOpened = Number(answers.accountsOpened);
-      const accountNumbers = answers.accountNumber || [];
-      if (Number.isSafeInteger(accountsOpened) && accountsOpened !== accountNumbers.length) errors.push(`Add ${accountsOpened} account number${accountsOpened === 1 ? '' : 's'} to match accounts opened today.`);
       if (errors.length) return res.status(422).json({ message: errors[0], fieldErrors: errors });
     const report = await Report.create({ reportDate, branchId: branch._id, branchName: branch.name, teamMemberId: teamMember._id, teamMemberName: teamMember.fullName, teamMemberDaoCode: teamMember.daoCode || '', teamMemberRole: teamMember.role || 'BDE', answers, questionSnapshot: questions.map(({ key, label, inputType }) => ({ key, label, inputType })) });
     return res.status(201).json({ report: { ...report.toObject(), answers: toPlainAnswers(report) } });
@@ -110,6 +120,8 @@ adminRouter.put('/branches/:id', requireCsrf, async (req, res, next) => { try { 
 adminRouter.get('/team-members', async (_req, res, next) => { try { res.json({ teamMembers: await TeamMember.find().sort({ fullName: 1 }).lean() }); } catch (error) { next(error); } });
 adminRouter.post('/team-members', requireCsrf, async (req, res, next) => { try { const payload = memberPayload.parse(req.body); const member = await TeamMember.create({ ...payload, daoCode: payload.daoCode.toUpperCase() }); res.status(201).json({ member }); } catch (error) { next(error); } });
 adminRouter.put('/team-members/:id', requireCsrf, async (req, res, next) => { try { const payload = memberPayload.parse(req.body); const member = await TeamMember.findByIdAndUpdate(req.params.id, { ...payload, daoCode: payload.daoCode.toUpperCase() }, { new: true, runValidators: true }); if (!member) return res.status(404).json({ message: 'Team member not found.' }); res.json({ member }); } catch (error) { next(error); } });
+adminRouter.get('/directory-requests', async (_req, res, next) => { try { res.json({ requests: await DirectoryRequest.find({ status: 'pending' }).sort({ createdAt: -1 }).lean() }); } catch (error) { next(error); } });
+adminRouter.post('/directory-requests/:id/status', requireCsrf, async (req, res, next) => { try { const { status } = directoryRequestStatusPayload.parse(req.body); const request = await DirectoryRequest.findOneAndUpdate({ _id: req.params.id, status: 'pending' }, { status, reviewedAt: new Date() }, { new: true }); if (!request) return res.status(404).json({ message: 'This registration request is no longer pending.' }); return res.json({ request }); } catch (error) { return next(error); } });
 
 function buildReportFilter(query) { const filter = {}; if (/^\d{4}-\d{2}-\d{2}$/.test(query.from)) filter.reportDate = { ...(filter.reportDate || {}), $gte: query.from }; if (/^\d{4}-\d{2}-\d{2}$/.test(query.to)) filter.reportDate = { ...(filter.reportDate || {}), $lte: query.to }; if (query.search?.trim()) { const regex = new RegExp(query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); filter.$or = [{ teamMemberName: regex }, { branchName: regex }]; } return filter; }
 async function queriedReports(query) { return Report.find(buildReportFilter(query)).sort({ reportDate: -1, createdAt: -1 }).lean(); }

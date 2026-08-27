@@ -51,6 +51,12 @@ function Field({ label, hint, children, className = '' }) {
   );
 }
 
+function LedgerPicker({ ariaLabel, disabled = false, emptyLabel, onChange, options, placeholder, value }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+  return <div className="ledger-picker"><button className={selected ? 'ledger-picker__trigger is-selected' : 'ledger-picker__trigger'} type="button" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen((current) => !current)}><span>{selected?.label || placeholder}</span><ChevronDown size={17} /></button>{open && <div className="ledger-picker__menu" role="listbox" aria-label={ariaLabel}>{options.length ? options.map((option) => <button type="button" role="option" aria-selected={option.value === value} className={option.value === value ? 'is-selected' : ''} key={option.value} onClick={() => { onChange(option.value); setOpen(false); }}><span>{option.label}</span>{option.value === value && <Check size={14} />}</button>) : <p>{emptyLabel}</p>}</div>}</div>;
+}
+
 export default function ReportForm() {
   const [form, setForm] = useState(initialForm);
   const [configuration, setConfiguration] = useState(emptyConfiguration);
@@ -58,6 +64,9 @@ export default function ReportForm() {
   const [configurationError, setConfigurationError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [accountNumberEntry, setAccountNumberEntry] = useState('');
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [registrationSubmitting, setRegistrationSubmitting] = useState(false);
+  const [registration, setRegistration] = useState({ fullName: '', branchName: '', daoCode: '', role: 'BDE' });
 
   useEffect(() => {
     api('/public/form')
@@ -77,7 +86,7 @@ export default function ReportForm() {
   const questions = Array.isArray(configuration?.questions) ? configuration.questions : [];
 
   const membersForBranch = useMemo(
-    () => teamMembers.filter((member) => !form.branchId || member.branchId === form.branchId),
+    () => form.branchId ? teamMembers.filter((member) => member.branchId === form.branchId) : [],
     [teamMembers, form.branchId],
   );
 
@@ -106,13 +115,19 @@ export default function ReportForm() {
     setForm((current) => ({ ...current, accountNumber: current.accountNumber.filter((value) => value !== accountNumber) }));
   }
 
+  async function submitDirectoryRequest(event) {
+    event.preventDefault();
+    setRegistrationSubmitting(true);
+    try {
+      await api('/public/directory-requests', { method: 'POST', body: JSON.stringify(registration) });
+      toast.success('Registration received. Your manager will update the directory.');
+      setRegistration({ fullName: '', branchName: '', daoCode: '', role: 'BDE' });
+      setRegistrationOpen(false);
+    } catch (error) { toast.error(error.message); } finally { setRegistrationSubmitting(false); }
+  }
+
   async function submit(event) {
     event.preventDefault();
-    const accountsOpened = Number(form.accountsOpened);
-    if (Number.isInteger(accountsOpened) && accountsOpened !== form.accountNumber.length) {
-      toast.error(`You recorded ${accountsOpened} account${accountsOpened === 1 ? '' : 's'} opened. Add the same number of account-number tags.`);
-      return;
-    }
     setSubmitting(true);
     try {
       await api('/public/reports', { method: 'POST', body: JSON.stringify(form) });
@@ -182,23 +197,12 @@ export default function ReportForm() {
                 <input type="date" value={form.reportDate} onChange={(event) => update('reportDate', event.target.value)} required />
               </Field>
               <Field label="Branch">
-                <div className="select-wrap">
-                  <select value={form.branchId} onChange={(event) => update('branchId', event.target.value)} required disabled={!branches.length}>
-                    <option value="">Select branch</option>
-                    {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
-                  </select>
-                  <ChevronDown size={17} />
-                </div>
+                <LedgerPicker ariaLabel="Select branch" disabled={!branches.length} emptyLabel="No branches have been added yet." onChange={(value) => update('branchId', value)} options={branches.map((branch) => ({ value: branch._id, label: branch.name }))} placeholder="Choose branch" value={form.branchId} />
               </Field>
               <Field label="BDE / DSO name">
-                <div className="select-wrap">
-                  <select value={form.teamMemberId} onChange={(event) => update('teamMemberId', event.target.value)} required disabled={!membersForBranch.length}>
-                    <option value="">Select team member</option>
-                    {membersForBranch.map((member) => <option key={member._id} value={member._id}>{member.fullName}</option>)}
-                  </select>
-                  <ChevronDown size={17} />
-                </div>
+                <LedgerPicker ariaLabel="Select BDE or DSO" disabled={!form.branchId || !membersForBranch.length} emptyLabel={form.branchId ? 'No BDE or DSO is listed for this branch yet.' : 'Choose a branch first.'} onChange={(value) => update('teamMemberId', value)} options={membersForBranch.map((member) => ({ value: member._id, label: member.fullName }))} placeholder={form.branchId ? 'Choose BDE / DSO' : 'Choose branch first'} value={form.teamMemberId} />
               </Field>
+              <div className="identity-request field--full"><div><strong>Can’t find your name?</strong><span>Send your name, branch, DAO code, and role for your manager to add.</span></div><button className="gold-link" type="button" onClick={() => setRegistrationOpen(true)}>Request access <ArrowRight size={14} /></button></div>
             </LedgerSection>
 
             <LedgerSection number="02" title="Daily performance">
@@ -259,7 +263,7 @@ export default function ReportForm() {
                 const required = question.required;
                 if (question.inputType === 'boolean') return <Field key={question.key} label={question.label} hint={question.helpText}><div className="segmented-control">{['Yes', 'No'].map((option) => <button type="button" key={option} className={value === option ? 'is-selected' : ''} onClick={() => updateCustom(question.key, option)}>{option}</button>)}</div></Field>;
                 if (question.inputType === 'paceRating') return <Field key={question.key} label={question.label} hint={question.helpText} className="field--full"><div className="pace-control">{paceOptions.map((pace) => <button type="button" className={value === pace ? `pace-control__option is-${pace.toLowerCase()}` : 'pace-control__option'} key={pace} onClick={() => updateCustom(question.key, pace)}><span />{pace}</button>)}</div></Field>;
-                if (question.inputType === 'select') return <Field key={question.key} label={question.label} hint={question.helpText}><div className="select-wrap"><select value={value} onChange={(event) => updateCustom(question.key, event.target.value)} required={required}><option value="">Select an option</option>{question.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><ChevronDown size={17} /></div></Field>;
+                if (question.inputType === 'select') return <Field key={question.key} label={question.label} hint={question.helpText}><LedgerPicker ariaLabel={question.label} emptyLabel="No options are configured." onChange={(selectedValue) => updateCustom(question.key, selectedValue)} options={question.options.map((option) => ({ value: option.value, label: option.label }))} placeholder="Choose an option" value={value} /></Field>;
                 if (question.inputType === 'textarea') return <Field key={question.key} label={question.label} hint={question.helpText} className="field--full"><textarea rows="3" maxLength={question.validation?.maxLength || 1000} value={value} onChange={(event) => updateCustom(question.key, event.target.value)} required={required} /></Field>;
                 if (question.inputType === 'currency') return <Field key={question.key} label={question.label} hint={moneyPreview(value) || question.helpText || 'Enter a Naira amount'}><input type="text" inputMode="decimal" placeholder="e.g. ₦250,000 or 1m" value={value} onChange={(event) => updateCustom(question.key, event.target.value)} required={required} /></Field>;
                 if (question.inputType === 'integer') return <Field key={question.key} label={question.label} hint={question.helpText || 'Whole number only'}><input type="number" min="0" step="1" inputMode="numeric" value={value} onChange={(event) => updateCustom(question.key, event.target.value)} required={required} /></Field>;
@@ -278,6 +282,7 @@ export default function ReportForm() {
           <div className="report-sheet__help"><span>Need support?</span> Contact your regional manager before submitting figures you cannot reconcile. <ArrowRight size={14} /></div>
         </section>
       </div>
+      {registrationOpen && <div className="registration-modal" role="dialog" aria-modal="true" aria-labelledby="registration-title"><div className="registration-modal__backdrop" onClick={() => setRegistrationOpen(false)} /><form className="registration-modal__sheet" onSubmit={submitDirectoryRequest}><button className="registration-modal__close" aria-label="Close registration" type="button" onClick={() => setRegistrationOpen(false)}><X size={18} /></button><p className="eyebrow">DIRECTORY REGISTRATION</p><h2 id="registration-title">Add your name to the ledger.</h2><p>Send your working details. This will not submit a report or add you automatically; your manager will review and update the directory.</p><Field label="Full name"><input value={registration.fullName} onChange={(event) => setRegistration({ ...registration, fullName: event.target.value })} required /></Field><Field label="Branch"><input value={registration.branchName} onChange={(event) => setRegistration({ ...registration, branchName: event.target.value })} required /></Field><Field label="DAO code"><input value={registration.daoCode} onChange={(event) => setRegistration({ ...registration, daoCode: event.target.value.toUpperCase() })} required /></Field><Field label="Role"><div className="segmented-control">{['BDE', 'DSO'].map((role) => <button type="button" key={role} className={registration.role === role ? 'is-selected' : ''} onClick={() => setRegistration({ ...registration, role })}>{role}</button>)}</div></Field><button className="primary-button" type="submit" disabled={registrationSubmitting}>{registrationSubmitting ? 'Sending…' : 'Send registration'} <Send size={16} /></button></form></div>}
     </main>
   );
 }

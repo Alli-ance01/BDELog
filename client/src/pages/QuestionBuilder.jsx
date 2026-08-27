@@ -17,10 +17,11 @@ export default function QuestionBuilder() {
   const [draft, setDraft] = useState(null);
   const [branchDraft, setBranchDraft] = useState({ name: '', code: '' });
   const [memberDraft, setMemberDraft] = useState({ fullName: '', daoCode: '', role: 'BDE', branchId: '' });
+  const [directoryRequests, setDirectoryRequests] = useState([]);
 
   useEffect(() => {
-    Promise.all([api('/admin/questions'), api('/admin/branches'), api('/admin/team-members')])
-      .then(([questionData, branchData, memberData]) => { setQuestions(questionData.questions); setBranches(branchData.branches); setTeamMembers(memberData.teamMembers); })
+    Promise.all([api('/admin/questions'), api('/admin/branches'), api('/admin/team-members'), api('/admin/directory-requests')])
+      .then(([questionData, branchData, memberData, requestData]) => { setQuestions(questionData.questions); setBranches(branchData.branches); setTeamMembers(memberData.teamMembers); setDirectoryRequests(requestData.requests); })
       .catch(() => navigate('/admin/login'));
   }, [navigate]);
 
@@ -50,6 +51,10 @@ export default function QuestionBuilder() {
     try { const result = await api('/admin/team-members', { method: 'POST', body: JSON.stringify(memberDraft) }); setTeamMembers((current) => [...current, result.member].sort((a, b) => a.fullName.localeCompare(b.fullName))); setMemberDraft({ fullName: '', daoCode: '', role: 'BDE', branchId: '' }); toast.success('BDE/DSO added to the managed directory.'); } catch (error) { toast.error(error.message); }
   }
 
+  async function resolveDirectoryRequest(request, status) {
+    try { await api(`/admin/directory-requests/${request._id}/status`, { method: 'POST', body: JSON.stringify({ status }) }); setDirectoryRequests((current) => current.filter((item) => item._id !== request._id)); toast.success(status === 'reviewed' ? 'Registration marked reviewed. Add the BDE/DSO above when ready.' : 'Registration dismissed.'); } catch (error) { toast.error(error.message); }
+  }
+
   return (
     <div className="admin-layout">
       <AdminSidebar />
@@ -63,6 +68,7 @@ export default function QuestionBuilder() {
             <form className="directory-panel" onSubmit={addBranch}><div className="directory-panel__header"><span>01</span><h3>Branch list</h3></div><div className="inline-form"><input aria-label="Branch name" placeholder="Branch name" value={branchDraft.name} onChange={(event) => setBranchDraft({ ...branchDraft, name: event.target.value })} required /><input aria-label="Branch code" placeholder="Code (optional)" value={branchDraft.code} onChange={(event) => setBranchDraft({ ...branchDraft, code: event.target.value })} /><button className="primary-button" type="submit"><Plus size={15} /> Add</button></div><div className="directory-panel__list">{branches.length ? branches.map((branch) => <span key={branch._id}>{branch.name}{branch.code ? <small>{branch.code}</small> : null}</span>) : <em>Add the branches in your region.</em>}</div></form>
             <form className="directory-panel" onSubmit={addMember}><div className="directory-panel__header"><span>02</span><h3>BDE / DSO list</h3></div><div className="member-directory-form"><input aria-label="BDE or DSO name" placeholder="Full name" value={memberDraft.fullName} onChange={(event) => setMemberDraft({ ...memberDraft, fullName: event.target.value })} required /><input aria-label="DAO code" placeholder="DAO code" value={memberDraft.daoCode} onChange={(event) => setMemberDraft({ ...memberDraft, daoCode: event.target.value.toUpperCase() })} required /><select aria-label="Branch" value={memberDraft.branchId} onChange={(event) => setMemberDraft({ ...memberDraft, branchId: event.target.value })} required><option value="">Select branch</option>{branches.filter((branch) => branch.isActive).map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}</select><select aria-label="Role" value={memberDraft.role} onChange={(event) => setMemberDraft({ ...memberDraft, role: event.target.value })}><option value="BDE">BDE</option><option value="DSO">DSO</option></select><button className="primary-button" type="submit" disabled={!branches.length}><UserPlus size={15} /> Add</button></div><div className="directory-panel__list">{teamMembers.length ? teamMembers.map((member) => <span key={member._id}>{member.fullName}<small>{member.daoCode || 'DAO pending'} · {member.role || 'BDE'} · {branches.find((branch) => branch._id === member.branchId)?.name || 'Assigned branch'}</small></span>) : <em>Add each BDE / DSO to their branch.</em>}</div></form>
           </div>
+          {directoryRequests.length > 0 && <section className="directory-requests"><div className="directory-requests__heading"><div><p className="eyebrow">PENDING REGISTRATIONS</p><h3>Names waiting for review</h3></div><span>{directoryRequests.length}</span></div><div className="directory-requests__list">{directoryRequests.map((request) => <article key={request._id}><div><strong>{request.fullName}</strong><span>{request.branchName} · {request.daoCode} · {request.role}</span></div><div><button className="secondary-button" type="button" onClick={() => resolveDirectoryRequest(request, 'dismissed')}>Dismiss</button><button className="primary-button" type="button" onClick={() => resolveDirectoryRequest(request, 'reviewed')}>Reviewed</button></div></article>)}</div></section>}
         </section>
 
         <section className="question-list"><div className="question-list__head"><span>ORDER</span><span>QUESTION</span><span>INPUT TYPE</span><span>REQUIRED</span><span /></div>{questions.length ? questions.map((question, index) => <article className="question-row" key={question._id}><span className="question-order"><GripVertical size={17} /> {String(index + 1).padStart(2, '0')}</span><button className="question-label" onClick={() => setDraft(question)}>{question.label}<small>{question.key}</small></button><span className="question-type">{typeLabels[question.inputType] || question.inputType}</span><span className={question.required ? 'required-mark is-required' : 'required-mark'}>{question.required ? 'Required' : 'Optional'}</span><button className="icon-button" aria-label={`Retire ${question.label}`} onClick={() => retire(question)}><Trash2 size={16} /></button></article>) : <div className="empty-studio">The daily template will appear here after the baseline questions are seeded.</div>}</section>

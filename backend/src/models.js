@@ -25,6 +25,16 @@ const teamMemberSchema = new Schema({
 }, { timestamps: true });
 teamMemberSchema.index({ fullName: 1, branchId: 1 }, { unique: true });
 
+const directoryRequestSchema = new Schema({
+  fullName: { type: String, required: true, trim: true, maxlength: 120 },
+  branchName: { type: String, required: true, trim: true, maxlength: 100 },
+  daoCode: { type: String, required: true, trim: true, uppercase: true, maxlength: 50 },
+  role: { type: String, required: true, enum: ['BDE', 'DSO'] },
+  status: { type: String, enum: ['pending', 'reviewed', 'dismissed'], default: 'pending' },
+  reviewedAt: { type: Date, default: null },
+}, { timestamps: true });
+directoryRequestSchema.index({ status: 1, createdAt: -1 });
+
 const optionSchema = new Schema({ label: { type: String, required: true, trim: true, maxlength: 100 }, value: { type: String, required: true, trim: true, maxlength: 100 } }, { _id: false });
 const validationSchema = new Schema({ min: Number, max: Number, pattern: String, maxLength: Number }, { _id: false });
 const conditionSchema = new Schema({ questionKey: String, equals: Schema.Types.Mixed }, { _id: false });
@@ -60,5 +70,6 @@ reportSchema.index({ reportDate: -1, branchName: 1, teamMemberName: 1 });
 export const Admin = mongoose.model('Admin', adminSchema);
 export const Branch = mongoose.model('Branch', branchSchema);
 export const TeamMember = mongoose.model('TeamMember', teamMemberSchema);
+export const DirectoryRequest = mongoose.model('DirectoryRequest', directoryRequestSchema);
 export const Question = mongoose.model('Question', questionSchema);
 export const Report = mongoose.model('Report', reportSchema);
