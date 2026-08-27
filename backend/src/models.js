@@ -6,6 +6,7 @@ const adminSchema = new Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   passwordHash: { type: String, required: true },
   displayName: { type: String, required: true, trim: true, maxlength: 100 },
+  role: { type: String, enum: ['owner', 'admin'], default: 'admin' },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 

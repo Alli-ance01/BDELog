@@ -1,16 +1,19 @@
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import XLSX from 'xlsx';
 import { Admin, Branch, Question, Report, TeamMember } from './models.js';
-import { clearSessionCookie, createSession, requireAdmin, requireCsrf, sessionCookie } from './middleware/auth.js';
-import { exportValue, makeQuestionKey, normaliseAnswer, PACE_OPTIONS } from './utils/normalise.js';
+import { clearSessionCookie, createSession, requireAdmin, requireCsrf, requireOwner, sessionCookie } from './middleware/auth.js';
+import { exportValue, makeQuestionKey, normaliseAnswer } from './utils/normalise.js';
 
 const questionInputTypes = ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber'];
 const questionPayload = z.object({ label: z.string().trim().min(3).max(180), helpText: z.string().trim().max(300).optional().default(''), inputType: z.enum(questionInputTypes), options: z.array(z.union([z.string().trim().min(1).max(100), z.object({ label: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(100) })])).max(30).optional().default([]), required: z.boolean().optional().default(false), order: z.number().int().min(0).optional(), validation: z.object({ maxLength: z.number().int().positive().max(1000).optional() }).optional(), showWhen: z.object({ questionKey: z.string().trim(), equals: z.union([z.string(), z.boolean(), z.number()]) }).nullable().optional() });
 const branchPayload = z.object({ name: z.string().trim().min(2).max(100), code: z.string().trim().max(20).optional().default(''), isActive: z.boolean().optional().default(true) });
 const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
+const adminCreatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254), password: z.string().min(12).max(128) });
+const adminUpdatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254) });
+const passwordResetPayload = z.object({ password: z.string().min(12).max(128) });
+const adminStatusPayload = z.object({ isActive: z.boolean() });
 
 function canonicalOptions(options) { return options.map((option) => typeof option === 'string' ? { label: option, value: option } : option); }
 function toPlainAnswers(report) { return Object.fromEntries(report.answers instanceof Map ? report.answers.entries() : Object.entries(report.answers || {})); }
@@ -69,14 +72,19 @@ authRouter.post('/login', async (req, res, next) => {
     if (!admin || !(await bcrypt.compare(password, admin.passwordHash))) return res.status(401).json({ message: 'The email or password is not recognised.' });
     const { token, csrfToken } = createSession(admin);
     sessionCookie(res, token);
-    return res.json({ admin: { id: admin._id, displayName: admin.displayName, email: admin.email }, csrfToken });
+    return res.json({ admin: { id: admin._id, displayName: admin.displayName, email: admin.email, role: admin.role || 'admin' }, csrfToken });
   } catch (error) { return next(error); }
 });
 authRouter.post('/logout', requireAdmin, requireCsrf, (_req, res) => { clearSessionCookie(res); res.json({ success: true }); });
-authRouter.get('/me', requireAdmin, async (req, res, next) => { try { const admin = await Admin.findById(req.admin.sub).select('displayName email isActive').lean(); if (!admin?.isActive) return res.status(401).json({ message: 'This administrator is no longer active.' }); return res.json({ admin }); } catch (error) { return next(error); } });
+authRouter.get('/me', requireAdmin, async (req, res, next) => { try { const admin = await Admin.findById(req.admin.sub).select('displayName email role isActive').lean(); if (!admin?.isActive) return res.status(401).json({ message: 'This administrator is no longer active.' }); return res.json({ admin: { ...admin, role: admin.role || 'admin' } }); } catch (error) { return next(error); } });
 
 export const adminRouter = Router();
 adminRouter.use(requireAdmin);
+adminRouter.get('/admins', requireOwner, async (_req, res, next) => { try { const admins = await Admin.find().select('displayName email role isActive createdAt updatedAt').sort({ role: 1, displayName: 1 }).lean(); return res.json({ admins: admins.map((admin) => ({ ...admin, role: admin.role || 'admin' })) }); } catch (error) { return next(error); } });
+adminRouter.post('/admins', requireOwner, requireCsrf, async (req, res, next) => { try { const payload = adminCreatePayload.parse(req.body); const admin = await Admin.create({ displayName: payload.displayName, email: payload.email.toLowerCase(), passwordHash: await bcrypt.hash(payload.password, 12), role: 'admin', isActive: true }); return res.status(201).json({ admin: { id: admin._id, displayName: admin.displayName, email: admin.email, role: admin.role, isActive: admin.isActive } }); } catch (error) { return next(error); } });
+adminRouter.put('/admins/:id', requireOwner, requireCsrf, async (req, res, next) => { try { const payload = adminUpdatePayload.parse(req.body); const admin = await Admin.findByIdAndUpdate(req.params.id, { displayName: payload.displayName, email: payload.email.toLowerCase() }, { new: true, runValidators: true }).select('displayName email role isActive createdAt updatedAt'); if (!admin) return res.status(404).json({ message: 'Administrator not found.' }); return res.json({ admin: { ...admin.toObject(), role: admin.role || 'admin' } }); } catch (error) { return next(error); } });
+adminRouter.post('/admins/:id/reset-password', requireOwner, requireCsrf, async (req, res, next) => { try { const { password } = passwordResetPayload.parse(req.body); const admin = await Admin.findByIdAndUpdate(req.params.id, { passwordHash: await bcrypt.hash(password, 12) }, { new: true }); if (!admin) return res.status(404).json({ message: 'Administrator not found.' }); return res.json({ success: true }); } catch (error) { return next(error); } });
+adminRouter.post('/admins/:id/status', requireOwner, requireCsrf, async (req, res, next) => { try { const { isActive } = adminStatusPayload.parse(req.body); if (req.params.id === req.admin.sub && !isActive) return res.status(422).json({ message: 'You cannot deactivate your own account.' }); const target = await Admin.findById(req.params.id); if (!target) return res.status(404).json({ message: 'Administrator not found.' }); if (!isActive && target.role === 'owner') { const otherOwners = await Admin.countDocuments({ role: 'owner', isActive: true, _id: { $ne: target._id } }); if (!otherOwners) return res.status(422).json({ message: 'BDELog must retain at least one active owner.' }); } target.isActive = isActive; await target.save(); return res.json({ admin: { id: target._id, displayName: target.displayName, email: target.email, role: target.role || 'admin', isActive: target.isActive } }); } catch (error) { return next(error); } });
 adminRouter.get('/dashboard', async (_req, res, next) => {
   try {
     const today = dateToday();

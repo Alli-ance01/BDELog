@@ -1,5 +1,5 @@
 // Gilded Ledger design reminder: the admin spine is narrow, ink-dark, and typographically ordered rather than card-heavy.
-import { BarChart3, ClipboardList, FileText, LogOut, Settings2 } from 'lucide-react';
+import { BarChart3, ClipboardList, LogOut, Settings2, ShieldCheck } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import BrandMark from './BrandMark';
 
@@ -7,6 +7,7 @@ const navigation = [
   { href: '/admin', label: 'Overview', icon: BarChart3 },
   { href: '/admin/reports', label: 'Reports', icon: ClipboardList },
   { href: '/admin/questions', label: 'Form studio', icon: Settings2 },
+  { href: '/admin/administrators', label: 'Access control', icon: ShieldCheck },
 ];
 
 export default function AdminSidebar() {

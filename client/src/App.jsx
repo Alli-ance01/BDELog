@@ -5,6 +5,7 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import QuestionBuilder from './pages/QuestionBuilder';
 import Reports from './pages/Reports';
+import AdminManagement from './pages/AdminManagement';
 
 function NotFound() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/questions" component={QuestionBuilder} />
       <Route path="/admin/reports" component={Reports} />
+      <Route path="/admin/administrators" component={AdminManagement} />
       <Route component={NotFound} />
     </Switch>
   );
