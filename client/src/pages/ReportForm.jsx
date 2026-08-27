@@ -27,6 +27,7 @@ const initialForm = {
 };
 
 const baselineQuestionKeys = new Set(['accountsOpened', 'alternateChannels', 'cumulativeOpeningBalance', 'amountMobilised', 'accountNumber', 'funded', 'carded', 'plannedClosures', 'hasCluster', 'needsHelp', 'helpDetails', 'paceRating']);
+const emptyConfiguration = { branches: [], teamMembers: [], questions: [] };
 
 function LedgerSection({ number, title, children }) {
   return (
@@ -52,20 +53,31 @@ function Field({ label, hint, children, className = '' }) {
 
 export default function ReportForm() {
   const [form, setForm] = useState(initialForm);
-  const [configuration, setConfiguration] = useState({ branches: [], teamMembers: [], questions: [] });
+  const [configuration, setConfiguration] = useState(emptyConfiguration);
   const [loadingConfiguration, setLoadingConfiguration] = useState(true);
+  const [configurationError, setConfigurationError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     api('/public/form')
-      .then(setConfiguration)
-      .catch(() => toast.message('The live form configuration will appear once the API is connected.'))
+      .then((data) => {
+        setConfiguration({
+          branches: Array.isArray(data?.branches) ? data.branches : [],
+          teamMembers: Array.isArray(data?.teamMembers) ? data.teamMembers : [],
+          questions: Array.isArray(data?.questions) ? data.questions : [],
+        });
+      })
+      .catch(() => { setConfiguration(emptyConfiguration); setConfigurationError(true); toast.message('The live form configuration will appear once the API is connected.'); })
       .finally(() => setLoadingConfiguration(false));
   }, []);
 
+  const branches = Array.isArray(configuration?.branches) ? configuration.branches : [];
+  const teamMembers = Array.isArray(configuration?.teamMembers) ? configuration.teamMembers : [];
+  const questions = Array.isArray(configuration?.questions) ? configuration.questions : [];
+
   const membersForBranch = useMemo(
-    () => configuration.teamMembers.filter((member) => !form.branchId || member.branchId === form.branchId),
-    [configuration.teamMembers, form.branchId],
+    () => teamMembers.filter((member) => !form.branchId || member.branchId === form.branchId),
+    [teamMembers, form.branchId],
   );
 
   function update(name, value) {
@@ -91,7 +103,7 @@ export default function ReportForm() {
   }
 
   const moneyPreview = (value) => value && formatNaira(value);
-  const additionalQuestions = configuration.questions.filter((question) => !baselineQuestionKeys.has(question.key));
+  const additionalQuestions = questions.filter((question) => !baselineQuestionKeys.has(question.key));
   const visibleAdditionalQuestions = additionalQuestions.filter((question) => {
     if (!question.showWhen) return true;
     const answer = form.customAnswers[question.showWhen.questionKey] ?? form[question.showWhen.questionKey];
@@ -134,7 +146,10 @@ export default function ReportForm() {
           </div>
 
           {loadingConfiguration && <div className="configuration-note"><Sparkles size={16} /> Preparing the live reporting template.</div>}
-          {!loadingConfiguration && (!configuration.branches.length || !configuration.teamMembers.length) && (
+          {!loadingConfiguration && configurationError && (
+            <div className="configuration-note configuration-note--amber"><CircleHelp size={16} /> The reporting directory is temporarily unavailable. Refresh after the API is connected.</div>
+          )}
+          {!loadingConfiguration && !configurationError && (!branches.length || !teamMembers.length) && (
             <div className="configuration-note configuration-note--amber"><CircleHelp size={16} /> Your administrator will add the official branch and BDE list in Form studio before this link is shared.</div>
           )}
 
@@ -145,9 +160,9 @@ export default function ReportForm() {
               </Field>
               <Field label="Branch">
                 <div className="select-wrap">
-                  <select value={form.branchId} onChange={(event) => update('branchId', event.target.value)} required disabled={!configuration.branches.length}>
+                  <select value={form.branchId} onChange={(event) => update('branchId', event.target.value)} required disabled={!branches.length}>
                     <option value="">Select branch</option>
-                    {configuration.branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
+                    {branches.map((branch) => <option key={branch._id} value={branch._id}>{branch.name}</option>)}
                   </select>
                   <ChevronDown size={17} />
                 </div>
@@ -227,7 +242,7 @@ export default function ReportForm() {
 
             <div className="report-submit">
               <p><Check size={16} /> Amounts are standardised before export.</p>
-              <button className="primary-button" disabled={submitting || !configuration.branches.length || !configuration.teamMembers.length} type="submit">{submitting ? 'Submitting…' : 'Submit today’s report'} <Send size={17} /></button>
+              <button className="primary-button" disabled={submitting || !branches.length || !teamMembers.length} type="submit">{submitting ? 'Submitting…' : 'Submit today’s report'} <Send size={17} /></button>
             </div>
           </form>
 
