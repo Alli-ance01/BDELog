@@ -9,8 +9,8 @@ import { exportValue, makeQuestionKey, normaliseAnswer } from './utils/normalise
 const questionInputTypes = ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber'];
 const questionPayload = z.object({ label: z.string().trim().min(3).max(180), helpText: z.string().trim().max(300).optional().default(''), inputType: z.enum(questionInputTypes), options: z.array(z.union([z.string().trim().min(1).max(100), z.object({ label: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(100) })])).max(30).optional().default([]), required: z.boolean().optional().default(false), order: z.number().int().min(0).optional(), validation: z.object({ maxLength: z.number().int().positive().max(1000).optional() }).optional(), showWhen: z.object({ questionKey: z.string().trim(), equals: z.union([z.string(), z.boolean(), z.number()]) }).nullable().optional() });
 const branchPayload = z.object({ name: z.string().trim().min(2).max(100), code: z.string().trim().max(20).optional().default(''), isActive: z.boolean().optional().default(true) });
-const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'DSO']), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
-const directoryRequestPayload = z.object({ fullName: z.string().trim().min(3).max(120), branchName: z.string().trim().min(2).max(100), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'DSO']) });
+const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'ESO']), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
+const directoryRequestPayload = z.object({ fullName: z.string().trim().min(3).max(120), branchName: z.string().trim().min(2).max(100), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'ESO']) });
 const directoryRequestStatusPayload = z.object({ status: z.enum(['reviewed', 'dismissed']) });
 const adminCreatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254), password: z.string().min(12).max(128) });
 const adminUpdatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254) });
@@ -56,7 +56,7 @@ publicRouter.post('/reports', async (req, res, next) => {
       TeamMember.findOne({ _id: teamMemberId, isActive: true }),
       Question.find({ isActive: true }).sort({ order: 1, createdAt: 1 }).lean(),
     ]);
-    if (!branch || !teamMember || teamMember.branchId.toString() !== branch._id.toString()) return res.status(422).json({ message: 'Select an active BDE/DSO from the selected branch.' });
+    if (!branch || !teamMember || teamMember.branchId.toString() !== branch._id.toString()) return res.status(422).json({ message: 'Select an active BDE/ESO from the selected branch.' });
     const sourceAnswers = { ...req.body, ...(req.body.customAnswers || {}) };
     const answers = {};
     const errors = [];

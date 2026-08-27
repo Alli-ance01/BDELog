@@ -19,7 +19,7 @@ const branchSchema = new Schema({
 const teamMemberSchema = new Schema({
   fullName: { type: String, required: true, trim: true, maxlength: 120 },
   daoCode: { type: String, trim: true, uppercase: true, maxlength: 50, unique: true, sparse: true },
-  role: { type: String, enum: ['BDE', 'DSO'], default: 'BDE' },
+  role: { type: String, enum: ['BDE', 'ESO'], default: 'BDE' },
   branchId: { type: Schema.Types.ObjectId, ref: 'Branch', required: true },
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
@@ -29,7 +29,7 @@ const directoryRequestSchema = new Schema({
   fullName: { type: String, required: true, trim: true, maxlength: 120 },
   branchName: { type: String, required: true, trim: true, maxlength: 100 },
   daoCode: { type: String, required: true, trim: true, uppercase: true, maxlength: 50 },
-  role: { type: String, required: true, enum: ['BDE', 'DSO'] },
+  role: { type: String, required: true, enum: ['BDE', 'ESO'] },
   status: { type: String, enum: ['pending', 'reviewed', 'dismissed'], default: 'pending' },
   reviewedAt: { type: Date, default: null },
 }, { timestamps: true });
@@ -60,7 +60,7 @@ const reportSchema = new Schema({
   teamMemberId: { type: Schema.Types.ObjectId, ref: 'TeamMember', required: true },
   teamMemberName: { type: String, required: true },
   teamMemberDaoCode: { type: String, default: '' },
-  teamMemberRole: { type: String, enum: ['BDE', 'DSO'], default: 'BDE' },
+  teamMemberRole: { type: String, enum: ['BDE', 'ESO'], default: 'BDE' },
   answers: { type: Map, of: Schema.Types.Mixed, default: {} },
   questionSnapshot: { type: [answerSnapshotSchema], default: [] },
 }, { timestamps: true });
