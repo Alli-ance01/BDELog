@@ -1,9 +1,11 @@
 // Gilded Ledger design reminder: the public report is a calm ledger sheet with an offset identity rail, not a generic centered form card.
-import { ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, LockKeyhole, Plus, Send, Sparkles, X } from 'lucide-react';
+/* Gilded Ledger public form: decisive controls, ivory space, and a black editorial identity rail. */
+import { ArrowRight, CalendarDays, Check, CircleHelp, LockKeyhole, Plus, Send, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { toast } from 'sonner';
 import BrandMark from '../components/BrandMark';
+import LedgerPicker from '../components/LedgerPicker';
 import { api } from '../lib/api';
 import { formatNaira, paceOptions, parseNaira } from '../lib/formUtils';
 
@@ -49,12 +51,6 @@ function Field({ label, hint, children, className = '' }) {
       {hint && <span className="field__hint">{hint}</span>}
     </label>
   );
-}
-
-function LedgerPicker({ ariaLabel, disabled = false, emptyLabel, onChange, options, placeholder, value }) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find((option) => option.value === value);
-  return <div className="ledger-picker"><button className={selected ? 'ledger-picker__trigger is-selected' : 'ledger-picker__trigger'} type="button" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen((current) => !current)}><span>{selected?.label || placeholder}</span><ChevronDown size={17} /></button>{open && <div className="ledger-picker__menu" role="listbox" aria-label={ariaLabel}>{options.length ? options.map((option) => <button type="button" role="option" aria-selected={option.value === value} className={option.value === value ? 'is-selected' : ''} key={option.value} onClick={() => { onChange(option.value); setOpen(false); }}><span>{option.label}</span>{option.value === value && <Check size={14} />}</button>) : <p>{emptyLabel}</p>}</div>}</div>;
 }
 
 export default function ReportForm() {
