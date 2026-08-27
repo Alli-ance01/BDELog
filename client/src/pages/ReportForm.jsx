@@ -1,5 +1,5 @@
 // Gilded Ledger design reminder: the public report is a calm ledger sheet with an offset identity rail, not a generic centered form card.
-import { ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, LockKeyhole, Send, Sparkles } from 'lucide-react';
+import { ArrowRight, CalendarDays, Check, ChevronDown, CircleHelp, LockKeyhole, Plus, Send, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'wouter';
 import { toast } from 'sonner';
@@ -15,7 +15,7 @@ const initialForm = {
   alternateChannels: '',
   cumulativeOpeningBalance: '',
   amountMobilised: '',
-  accountNumber: '',
+  accountNumber: [],
   funded: '',
   carded: '',
   plannedClosures: '',
@@ -57,6 +57,7 @@ export default function ReportForm() {
   const [loadingConfiguration, setLoadingConfiguration] = useState(true);
   const [configurationError, setConfigurationError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [accountNumberEntry, setAccountNumberEntry] = useState('');
 
   useEffect(() => {
     api('/public/form')
@@ -88,8 +89,30 @@ export default function ReportForm() {
     setForm((current) => ({ ...current, customAnswers: { ...current.customAnswers, [key]: value } }));
   }
 
+  function addAccountNumbers(rawValue = accountNumberEntry) {
+    const candidates = String(rawValue).split(/[\s,;]+/).map((value) => value.replace(/\D/g, '')).filter(Boolean);
+    if (!candidates.length) return;
+    const invalid = candidates.find((value) => value.length < 4 || value.length > 32);
+    if (invalid) { toast.error('Each account number must contain 4–32 digits.'); return; }
+    const duplicate = candidates.find((value) => form.accountNumber.includes(value));
+    if (duplicate) { toast.error(`${duplicate} is already in this report.`); setAccountNumberEntry(''); return; }
+    const uniqueValues = [...new Set(candidates)];
+    if (uniqueValues.length !== candidates.length) { toast.error('The pasted list contains a duplicate account number.'); return; }
+    setForm((current) => ({ ...current, accountNumber: [...current.accountNumber, ...uniqueValues] }));
+    setAccountNumberEntry('');
+  }
+
+  function removeAccountNumber(accountNumber) {
+    setForm((current) => ({ ...current, accountNumber: current.accountNumber.filter((value) => value !== accountNumber) }));
+  }
+
   async function submit(event) {
     event.preventDefault();
+    const accountsOpened = Number(form.accountsOpened);
+    if (Number.isInteger(accountsOpened) && accountsOpened !== form.accountNumber.length) {
+      toast.error(`You recorded ${accountsOpened} account${accountsOpened === 1 ? '' : 's'} opened. Add the same number of account-number tags.`);
+      return;
+    }
     setSubmitting(true);
     try {
       await api('/public/reports', { method: 'POST', body: JSON.stringify(form) });
@@ -191,8 +214,14 @@ export default function ReportForm() {
               <Field label="Amount mobilised today" hint={moneyPreview(form.amountMobilised) || 'Enter an amount in Naira'}>
                 <input type="text" inputMode="decimal" placeholder="e.g. ₦250,000" value={form.amountMobilised} onChange={(event) => update('amountMobilised', event.target.value)} required aria-invalid={Boolean(form.amountMobilised && parseNaira(form.amountMobilised) === null)} />
               </Field>
-              <Field label="Account number" hint="Optional — leading zeros are preserved" className="field--full">
-                <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength="32" value={form.accountNumber} onChange={(event) => update('accountNumber', event.target.value.replace(/\D/g, ''))} />
+              <Field label="Account numbers opened today" hint="Enter one number at a time, then press Enter or Add. You may also paste a comma- or line-separated list. Leading zeros are preserved." className="field--full">
+                <div className="account-ledger-input">
+                  <div className="account-ledger-input__entry">
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength="512" placeholder="Enter account number" value={accountNumberEntry} onChange={(event) => setAccountNumberEntry(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addAccountNumbers(); } }} />
+                    <button className="secondary-button" type="button" onClick={() => addAccountNumbers()} disabled={!accountNumberEntry.trim()}><Plus size={15} /> Add</button>
+                  </div>
+                  {form.accountNumber.length > 0 && <div className="account-ledger-tags" aria-label="Account numbers entered for today">{form.accountNumber.map((accountNumber) => <span key={accountNumber}>{accountNumber}<button type="button" aria-label={`Remove account number ${accountNumber}`} onClick={() => removeAccountNumber(accountNumber)}><X size={13} /></button></span>)}</div>}
+                </div>
               </Field>
             </LedgerSection>
 

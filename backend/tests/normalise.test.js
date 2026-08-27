@@ -16,9 +16,11 @@ test('counts reject words and negative values', () => {
   assert.ok(normaliseAnswer(question, '-14').error);
 });
 
-test('account numbers keep meaningful leading zeros', () => {
-  const question = { label: 'Account number', inputType: 'accountNumber' };
-  assert.deepEqual(normaliseAnswer(question, '0012345678'), { value: '0012345678' });
+test('account numbers keep leading zeros as unique canonical arrays', () => {
+  const question = { label: 'Account numbers', inputType: 'accountNumber' };
+  assert.deepEqual(normaliseAnswer(question, ['0012345678', '9988776655']), { value: ['0012345678', '9988776655'] });
+  assert.ok(normaliseAnswer(question, ['0012345678', '0012345678']).error);
+  assert.ok(normaliseAnswer(question, ['123']).error);
 });
 
 test('binary and pace controls accept only their canonical values', () => {

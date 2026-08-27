@@ -18,7 +18,7 @@ export function parseCurrency(value) {
 }
 
 export function normaliseAnswer(question, value) {
-  const empty = value === undefined || value === null || value === '';
+  const empty = value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
   if (empty) return { value: null };
 
   if (question.inputType === 'integer') {
@@ -35,8 +35,11 @@ export function normaliseAnswer(question, value) {
     return /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? { value: String(value) } : { error: `${question.label} must use a valid date.` };
   }
   if (question.inputType === 'accountNumber') {
-    const result = String(value).replace(/\s/g, '');
-    return /^\d{4,32}$/.test(result) ? { value: result } : { error: `${question.label} must contain 4–32 digits.` };
+    const rawValues = Array.isArray(value) ? value : [value];
+    const result = rawValues.map((item) => String(item).replace(/\s/g, ''));
+    if (result.some((item) => !/^\d{4,32}$/.test(item))) return { error: `Each ${question.label.toLowerCase()} must contain 4–32 digits.` };
+    if (new Set(result).size !== result.length) return { error: 'Each account number can be entered only once per report.' };
+    return { value: result };
   }
   if (question.inputType === 'boolean') {
     if (value === true || value === 'Yes') return { value: true };
@@ -59,5 +62,6 @@ export function exportValue(question, value) {
   if (value === null || value === undefined) return '';
   if (question.inputType === 'currency') return `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   if (question.inputType === 'boolean') return value ? 'Yes' : 'No';
+  if (question.inputType === 'accountNumber' && Array.isArray(value)) return value.join(' | ');
   return value;
 }

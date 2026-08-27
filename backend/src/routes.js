@@ -47,15 +47,18 @@ publicRouter.post('/reports', async (req, res, next) => {
     const sourceAnswers = { ...req.body, ...(req.body.customAnswers || {}) };
     const answers = {};
     const errors = [];
-    for (const question of questions) {
+      for (const question of questions) {
       const shouldShow = !question.showWhen || sourceAnswers[question.showWhen.questionKey] === question.showWhen.equals || (question.showWhen.equals === true && sourceAnswers[question.showWhen.questionKey] === 'Yes');
       if (!shouldShow) continue;
       const result = normaliseAnswer(question, sourceAnswers[question.key]);
       if (question.required && (result.value === null || result.value === '')) errors.push(`${question.label} is required.`);
       else if (result.error) errors.push(result.error);
-      else if (result.value !== null) answers[question.key] = result.value;
-    }
-    if (errors.length) return res.status(422).json({ message: errors[0], fieldErrors: errors });
+        else if (result.value !== null) answers[question.key] = result.value;
+      }
+      const accountsOpened = Number(answers.accountsOpened);
+      const accountNumbers = answers.accountNumber || [];
+      if (Number.isSafeInteger(accountsOpened) && accountsOpened !== accountNumbers.length) errors.push(`Add ${accountsOpened} account number${accountsOpened === 1 ? '' : 's'} to match accounts opened today.`);
+      if (errors.length) return res.status(422).json({ message: errors[0], fieldErrors: errors });
     const report = await Report.create({ reportDate, branchId: branch._id, branchName: branch.name, teamMemberId: teamMember._id, teamMemberName: teamMember.fullName, answers, questionSnapshot: questions.map(({ key, label, inputType }) => ({ key, label, inputType })) });
     return res.status(201).json({ report: { ...report.toObject(), answers: toPlainAnswers(report) } });
   } catch (error) {
