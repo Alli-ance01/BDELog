@@ -51,7 +51,7 @@ The Form Studio now stores categories with names, descriptions, display order, a
 
 Every BDE/ESo has the standard monthly minimum of **45 accounts opened** and **₦8,000,000 mobilised**. A successful daily report response includes the selected worker’s month-to-date totals for the report month, the remaining account and mobilisation balances, and any surplus after a target is exceeded. The worker form keeps this monthly pace card visible after submission and starts a fresh daily form for the next entry. The aggregation is based on submitted reports for the selected worker and uses the report date’s `YYYY-MM` month boundary.
 
-Then sign in, add your branches and BDE/ESo team list, and share the public reporting URL. Do not share the public form before its branch and team lists have been configured.
+Then sign in, add your branches and BDE/ESo team list, and share the public reporting URL. In Form Studio’s **Canonical Identity Directory**, use the pencil action beside any branch or BDE/ESO record to update its name, branch assignment, DAO code, role, or active state. These edits apply to future worker selections and report snapshots; historical reports retain the identity values recorded at submission time. Do not share the public form before its branch and team lists have been configured.
 
 ## Deploying
 

@@ -17,3 +17,9 @@
 - [x] Render a daily-updated worker progress summary with clear target and surplus states
 - [x] Add tests for monthly aggregation, zero/negative remaining values, and over-target messaging
 - [x] Run the full validation suite and push the monthly target update to Alli-ance01/BDELog
+
+- [x] Add admin editing for BDE/ESO full name, branch assignment, and DAO code
+- [x] Validate directory edits and preserve worker/report references when names or codes change
+- [x] Reflect updated directory entries in the public worker selector and new report snapshots
+- [x] Add tests for directory update validation and branch reassignment behavior
+- [x] Run the full validation suite and push the directory editor update to Alli-ance01/BDELog

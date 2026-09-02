@@ -22,8 +22,8 @@ const questionValidation = z.object({
 const showWhenPayload = z.object({ questionKey: z.string().trim().min(1).max(80), equals: z.union([z.string(), z.boolean(), z.number()]) }).nullable().optional().default(null);
 const categoryPayload = z.object({ name: z.string().trim().min(2).max(120), description: z.string().trim().max(320).optional().default(''), order: z.number().int().min(0).optional(), isActive: z.boolean().optional().default(true) });
 const questionPayload = z.object({ label: z.string().trim().min(3).max(180), helpText: z.string().trim().max(300).optional().default(''), inputType: z.enum(questionInputTypes), options: z.array(questionOption).max(30).optional().default([]), required: z.boolean().optional().default(false), isActive: z.boolean().optional().default(true), categoryId: z.string().regex(/^[a-f\d]{24}$/i).nullable().optional().default(null), order: z.number().int().min(0).optional(), validation: questionValidation, showWhen: showWhenPayload });
-const branchPayload = z.object({ name: z.string().trim().min(2).max(100), code: z.string().trim().max(20).optional().default(''), isActive: z.boolean().optional().default(true) });
-const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'ESO']), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
+export const branchPayload = z.object({ name: z.string().trim().min(2).max(100), code: z.string().trim().max(20).optional().default(''), isActive: z.boolean().optional().default(true) });
+export const memberPayload = z.object({ fullName: z.string().trim().min(3).max(120), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'ESO']), branchId: z.string().regex(/^[a-f\d]{24}$/i), isActive: z.boolean().optional().default(true) });
 const directoryRequestPayload = z.object({ fullName: z.string().trim().min(3).max(120), branchName: z.string().trim().min(2).max(100), daoCode: z.string().trim().min(2).max(50).regex(/^[A-Za-z0-9/_-]+$/, 'DAO code can contain letters, numbers, hyphens, underscores, or slashes only.'), role: z.enum(['BDE', 'ESO']) });
 const directoryRequestStatusPayload = z.object({ status: z.enum(['reviewed', 'dismissed']) });
 const adminCreatePayload = z.object({ displayName: z.string().trim().min(2).max(100), email: z.string().trim().email().max(254), password: z.string().min(12).max(128) });
@@ -43,7 +43,7 @@ function normaliseValidation(validation = {}) {
 }
 function normaliseQuestionPayload(payload) { return { ...payload, options: canonicalOptions(payload.options), validation: normaliseValidation(payload.validation), categoryId: payload.categoryId || null }; }
 function questionSequenceFilter(categoryId) { return categoryId ? { categoryId } : { categoryId: null }; }
-function normaliseBranchPayload(payload) { return { ...payload, code: payload.code ? payload.code.trim().toUpperCase() : undefined }; }
+export function normaliseBranchPayload(payload) { return { ...payload, code: payload.code ? payload.code.trim().toUpperCase() : undefined }; }
 function toPlainAnswers(report) { return Object.fromEntries(report.answers instanceof Map ? report.answers.entries() : Object.entries(report.answers || {})); }
 function dateToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()); }
 function nextMonthKey(month) {

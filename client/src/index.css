@@ -312,3 +312,22 @@ textarea { resize: vertical; min-height: 88px; }
   .monthly-progress__stamp { margin-top: 13px; }
   .monthly-progress__metrics { grid-template-columns: 1fr; }
 }
+
+
+/* Editable identity directory */
+.directory-panel__list { display: grid; flex-wrap: initial; gap: 0; }
+.directory-entry { align-items: center; background: #f1eee5; border-top: 1px solid var(--paper); display: flex; gap: 8px; justify-content: space-between; min-height: 42px; padding: 6px 7px 6px 9px; }
+.directory-entry:first-child { border-top: 0; }
+.directory-entry > div { min-width: 0; }
+.directory-entry strong, .directory-entry small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.directory-entry strong { color: var(--ink); font-size: 10px; font-weight: 800; }
+.directory-entry small { color: var(--muted); font-size: 8px; margin: 3px 0 0; }
+.directory-entry .icon-button { flex: 0 0 auto; height: 28px; width: 28px; }
+.directory-entry .icon-button:hover { color: var(--gold); }
+.admin-editor { max-width: 480px; }
+.admin-editor .drawer-intro { max-width: 390px; }
+.admin-editor > .field { margin-bottom: 18px; }
+.admin-editor .drawer-footer { margin-top: auto; }
+@media (max-width: 720px) {
+  .admin-editor { max-width: none; }
+}
