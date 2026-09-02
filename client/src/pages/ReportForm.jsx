@@ -214,6 +214,12 @@ export default function ReportForm() {
               <Field label="Amount mobilised today" hint={moneyPreview(form.amountMobilised) || 'Enter an amount in Naira'}>
                 <input type="text" inputMode="decimal" placeholder="e.g. ₦250,000" value={form.amountMobilised} onChange={(event) => update('amountMobilised', event.target.value)} required aria-invalid={Boolean(form.amountMobilised && parseNaira(form.amountMobilised) === null)} />
               </Field>
+              <Field label="How many funded?" hint="Whole number only">
+                <input type="number" min="0" step="1" inputMode="numeric" value={form.funded} onChange={(event) => update('funded', event.target.value)} required />
+              </Field>
+              <Field label="How many carded?" hint="Whole number only">
+                <input type="number" min="0" step="1" inputMode="numeric" value={form.carded} onChange={(event) => update('carded', event.target.value)} required />
+              </Field>
               <Field label="Account numbers opened today" hint="Enter one 10-digit number at a time, then press Enter or Add. You may also paste a comma- or line-separated list. Leading zeros are preserved." className="field--full">
                 <div className="account-ledger-input">
                   <div className="account-ledger-input__entry">
@@ -226,12 +232,6 @@ export default function ReportForm() {
             </LedgerSection>
 
             <LedgerSection number="03" title="Pipeline and support">
-              <Field label="How many funded?" hint="Whole number only">
-                <input type="number" min="0" step="1" inputMode="numeric" value={form.funded} onChange={(event) => update('funded', event.target.value)} required />
-              </Field>
-              <Field label="How many carded?" hint="Whole number only">
-                <input type="number" min="0" step="1" inputMode="numeric" value={form.carded} onChange={(event) => update('carded', event.target.value)} required />
-              </Field>
               <Field label="Intended closures this week" hint="Whole number only">
                 <input type="number" min="0" step="1" inputMode="numeric" value={form.plannedClosures} onChange={(event) => update('plannedClosures', event.target.value)} required />
               </Field>
