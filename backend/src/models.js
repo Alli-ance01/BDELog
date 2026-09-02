@@ -36,8 +36,24 @@ const directoryRequestSchema = new Schema({
 directoryRequestSchema.index({ status: 1, createdAt: -1 });
 
 const optionSchema = new Schema({ label: { type: String, required: true, trim: true, maxlength: 100 }, value: { type: String, required: true, trim: true, maxlength: 100 } }, { _id: false });
-const validationSchema = new Schema({ min: Number, max: Number, pattern: String, maxLength: Number }, { _id: false });
+const validationSchema = new Schema({
+  min: Number,
+  max: Number,
+  minLength: Number,
+  maxLength: Number,
+  pattern: String,
+  minDate: String,
+  maxDate: String,
+}, { _id: false });
 const conditionSchema = new Schema({ questionKey: String, equals: Schema.Types.Mixed }, { _id: false });
+
+const categorySchema = new Schema({
+  name: { type: String, required: true, trim: true, maxlength: 120, unique: true },
+  description: { type: String, trim: true, maxlength: 320, default: '' },
+  order: { type: Number, required: true, default: 0 },
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
+categorySchema.index({ order: 1, createdAt: 1 });
 
 const questionSchema = new Schema({
   key: { type: String, required: true, unique: true, immutable: true, trim: true, maxlength: 80 },
@@ -47,12 +63,14 @@ const questionSchema = new Schema({
   options: { type: [optionSchema], default: [] },
   validation: { type: validationSchema, default: {} },
   showWhen: { type: conditionSchema, default: null },
+  categoryId: { type: Schema.Types.ObjectId, ref: 'QuestionCategory', required: false, default: null },
   required: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },
   order: { type: Number, required: true, default: 0 },
 }, { timestamps: true });
+questionSchema.index({ categoryId: 1, order: 1, createdAt: 1 });
 
-const answerSnapshotSchema = new Schema({ key: String, label: String, inputType: String }, { _id: false });
+const answerSnapshotSchema = new Schema({ key: String, label: String, inputType: String, categoryId: Schema.Types.ObjectId, categoryName: String, order: Number }, { _id: false });
 const reportSchema = new Schema({
   reportDate: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ },
   branchId: { type: Schema.Types.ObjectId, ref: 'Branch', required: true },
@@ -71,5 +89,6 @@ export const Admin = mongoose.model('Admin', adminSchema);
 export const Branch = mongoose.model('Branch', branchSchema);
 export const TeamMember = mongoose.model('TeamMember', teamMemberSchema);
 export const DirectoryRequest = mongoose.model('DirectoryRequest', directoryRequestSchema);
+export const QuestionCategory = mongoose.model('QuestionCategory', categorySchema);
 export const Question = mongoose.model('Question', questionSchema);
 export const Report = mongoose.model('Report', reportSchema);

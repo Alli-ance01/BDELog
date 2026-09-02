@@ -32,13 +32,22 @@ The backend reads its production environment variables from the Render dashboard
 
 ## First production data
 
-After provisioning MongoDB Atlas and configuring Render variables, run these two commands in a one-time Render shell or from a secure local machine with the same variables:
+After provisioning MongoDB Atlas and configuring Render variables, run these commands in a one-time Render shell or from a secure local machine with the same variables:
 
 ```bash
 cd backend
 npm run seed:admin
 npm run seed:template
 ```
+
+If the database already contains the original flat question template, run the category migration once before sharing the form:
+
+```bash
+cd backend
+npm run migrate:categories
+```
+
+The Form Studio now stores categories with names, descriptions, display order, and active state. Questions carry a category assignment, position within that category, complete field configuration, and an active/retired state. The public report form reads the same configuration and renders the worker flow in category order, then question order.
 
 Then sign in, add your branches and BDE/ESo team list, and share the public reporting URL. Do not share the public form before its branch and team lists have been configured.
 
