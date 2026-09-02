@@ -331,3 +331,23 @@ textarea { resize: vertical; min-height: 88px; }
 @media (max-width: 720px) {
   .admin-editor { max-width: none; }
 }
+
+
+/* Post-submit progress announcement */
+.submission-notice { align-items: center; background: #f5edcf; border: 1px solid #c9a646; box-shadow: 0 15px 30px rgba(45,37,17,.12); display: flex; gap: 12px; margin: -8px 0 22px; padding: 13px 14px; position: relative; scroll-margin-top: 18px; z-index: 2; }
+.submission-notice:focus { outline: 2px solid var(--ink); outline-offset: 3px; }
+.submission-notice__icon { align-items: center; background: var(--ink); border-radius: 50%; color: var(--gold-light); display: inline-flex; flex: 0 0 auto; height: 31px; justify-content: center; width: 31px; }
+.submission-notice__copy { display: grid; gap: 3px; min-width: 0; }
+.submission-notice__copy .eyebrow { color: #75601f; margin: 0; }
+.submission-notice__copy strong { color: var(--ink); font-size: 13px; }
+.submission-notice__copy span { color: #645a3d; font-size: 10px; line-height: 1.35; }
+.submission-notice__view { align-items: center; background: var(--ink); color: #fff; display: inline-flex; flex: 0 0 auto; font-size: 9px; font-weight: 800; gap: 7px; letter-spacing: .08em; margin-left: auto; padding: 10px 11px; text-transform: uppercase; }
+.submission-notice__view:hover { background: #3b3a33; }
+.submission-notice__close { align-items: center; background: transparent; color: #75601f; display: inline-flex; flex: 0 0 auto; height: 28px; justify-content: center; width: 28px; }
+.submission-notice__close:hover { color: var(--ink); }
+@media (max-width: 720px) {
+  .submission-notice { align-items: flex-start; flex-wrap: wrap; margin: -8px -20px 20px; padding: 14px 20px; }
+  .submission-notice__copy { flex: 1 1 calc(100% - 50px); }
+  .submission-notice__view { flex: 1 1 auto; margin-left: 43px; }
+  .submission-notice__close { margin-left: auto; }
+}

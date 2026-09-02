@@ -23,3 +23,8 @@
 - [x] Reflect updated directory entries in the public worker selector and new report snapshots
 - [x] Add tests for directory update validation and branch reassignment behavior
 - [x] Run the full validation suite and push the directory editor update to Alli-ance01/BDELog
+
+- [x] Make the monthly progress result immediately noticeable after report submission
+- [x] Move focus to the result and provide a clear post-submission announcement without requiring upward scrolling
+- [x] Verify the announcement and focus behavior on desktop and responsive mobile layouts
+- [x] Run the full validation suite and push the post-submission visibility fix to Alli-ance01/BDELog

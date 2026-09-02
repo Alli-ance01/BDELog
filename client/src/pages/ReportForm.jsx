@@ -1,6 +1,6 @@
 /* Gilded Ledger public form: decisive controls, ivory space, and a black editorial identity rail. */
 import { ArrowRight, CalendarDays, Check, CircleHelp, LockKeyhole, Plus, Send, Sparkles, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { toast } from 'sonner';
 import BrandMark from '../components/BrandMark';
@@ -28,7 +28,7 @@ function Field({ label, hint, children, className = '' }) {
   return <label className={`field ${className}`}><span className="field__label">{label}</span>{children}{hint && <span className="field__hint">{hint}</span>}</label>;
 }
 
-function MonthlyProgress({ progress }) {
+function MonthlyProgress({ progress, progressRef }) {
   if (!progress) return null;
   const metric = (key, label, formatter) => {
     const value = progress[key];
@@ -38,7 +38,14 @@ function MonthlyProgress({ progress }) {
     const displayValue = surplus ? `+${formatter(value.surplus)}` : formatter(value.remaining);
     return <article className={surplus ? 'monthly-progress__metric is-surplus' : value.reached ? 'monthly-progress__metric is-complete' : 'monthly-progress__metric'}><div className="monthly-progress__metric-heading"><span>{displayLabel}</span><strong>{displayValue}</strong></div><p>{surplus ? 'Monthly target exceeded' : value.reached ? 'Target reached' : `${formatter(value.remaining)} left this month`}</p><div className="monthly-progress__bar"><span style={{ width: `${percentage}%` }} /></div><small>{formatter(value.achieved)} of {formatter(value.target)} achieved</small></article>;
   };
-  return <section className="monthly-progress" aria-live="polite"><div className="monthly-progress__heading"><div><p className="eyebrow">MONTHLY PACE / {progress.month}</p><h3>Your position this month</h3><p>Today’s approved report is now included. Your remaining balance updates after every daily submission.</p></div><div className="monthly-progress__stamp"><Sparkles size={15} /> Live ledger</div></div><div className="monthly-progress__metrics">{metric('accountsOpened', 'Accounts to open', (value) => `${value}`)}{metric('amountMobilised', 'Mobilisation to go', formatNaira)}</div></section>;
+  return <section ref={progressRef} id="monthly-progress" className="monthly-progress" aria-labelledby="monthly-progress-title" tabIndex="-1"><div className="monthly-progress__heading"><div><p className="eyebrow">MONTHLY PACE / {progress.month}</p><h3 id="monthly-progress-title">Your position this month</h3><p>Today’s approved report is now included. Your remaining balance updates after every daily submission.</p></div><div className="monthly-progress__stamp"><Sparkles size={15} /> Live ledger</div></div><div className="monthly-progress__metrics">{metric('accountsOpened', 'Accounts to open', (value) => `${value}`)}{metric('amountMobilised', 'Mobilisation to go', formatNaira)}</div></section>;
+}
+
+function SubmissionNotice({ progress, noticeRef, onView, onDismiss }) {
+  if (!progress) return null;
+  const accountText = progress.accountsOpened.surplus > 0 ? `+${progress.accountsOpened.surplus} accounts above target` : progress.accountsOpened.reached ? '45-account target reached' : `${progress.accountsOpened.remaining} accounts left`;
+  const amountText = progress.amountMobilised.surplus > 0 ? `+${formatNaira(progress.amountMobilised.surplus)} above target` : progress.amountMobilised.reached ? '₦8,000,000 target reached' : `${formatNaira(progress.amountMobilised.remaining)} left`;
+  return <aside ref={noticeRef} className="submission-notice" role="region" aria-live="assertive" aria-labelledby="submission-notice-title" tabIndex="-1"><div className="submission-notice__icon"><Check size={17} /></div><div className="submission-notice__copy"><p className="eyebrow">REPORT SAVED / MONTHLY PACE UPDATED</p><strong id="submission-notice-title">Your progress is ready to view</strong><span>{accountText} · {amountText}</span></div><button className="submission-notice__view" type="button" onClick={onView}>View progress <ArrowRight size={14} /></button><button className="submission-notice__close" type="button" aria-label="Dismiss monthly progress announcement" onClick={onDismiss}><X size={16} /></button></aside>;
 }
 
 export default function ReportForm() {
@@ -48,10 +55,22 @@ export default function ReportForm() {
   const [configurationError, setConfigurationError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [monthlyProgress, setMonthlyProgress] = useState(null);
+  const [submissionNotice, setSubmissionNotice] = useState(null);
+  const monthlyProgressRef = useRef(null);
+  const submissionNoticeRef = useRef(null);
   const [accountNumberEntry, setAccountNumberEntry] = useState({});
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationSubmitting, setRegistrationSubmitting] = useState(false);
   const [registration, setRegistration] = useState({ fullName: '', branchName: '', daoCode: '', role: 'BDE' });
+
+  useEffect(() => {
+    if (!submissionNotice) return;
+    const frame = window.requestAnimationFrame(() => {
+      submissionNoticeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      submissionNoticeRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [submissionNotice]);
 
   useEffect(() => {
     api('/public/form')
@@ -129,6 +148,7 @@ export default function ReportForm() {
     try {
       const result = await api('/public/reports', { method: 'POST', body: JSON.stringify(form) });
       setMonthlyProgress(result.monthlyProgress || null);
+      setSubmissionNotice(result.monthlyProgress || null);
       toast.success('Report submitted and added to the ledger.');
       setForm({ ...initialForm, reportDate: new Date().toISOString().slice(0, 10) });
       setAccountNumberEntry({});
@@ -159,12 +179,12 @@ export default function ReportForm() {
     <header className="public-topbar"><BrandMark inverse /><div className="public-topbar__meta"><span>Regional Sales / Daily desk</span><Link href="/admin/login" className="admin-entry"><LockKeyhole size={14} /> Admin</Link></div></header>
     <div className="report-layout">
       <aside className="report-rail"><div className="report-rail__hero" /><div className="report-rail__content"><p className="eyebrow eyebrow--gold">DAILY FIELD INTELLIGENCE</p><h1>Close today’s report with numbers that reconcile.</h1><p className="report-rail__copy">Every entry becomes a cleaner regional view. Submit carefully—your manager sees the ledger in real time.</p><ol className="progress-list" aria-label="Form progress"><li className="is-active"><span>01</span> Identity</li>{groupedSections.slice(0, 4).map((section, index) => <li key={section._id}><span>{String(index + 2).padStart(2, '0')}</span> {section.name}</li>)}</ol></div><div className="report-rail__footer">BDELog / Alternative Bank regional sales</div></aside>
-      <section className="report-sheet"><div className="report-sheet__intro"><div><p className="eyebrow">TODAY’S ENTRY</p><h2>Daily report</h2></div><div className="report-sheet__date"><CalendarDays size={16} /><span>{new Intl.DateTimeFormat('en-NG', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</span></div></div>
+      <section className="report-sheet"><SubmissionNotice progress={submissionNotice} noticeRef={submissionNoticeRef} onView={() => { setSubmissionNotice(null); monthlyProgressRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); monthlyProgressRef.current?.focus({ preventScroll: true }); }} onDismiss={() => setSubmissionNotice(null)} /><div className="report-sheet__intro"><div><p className="eyebrow">TODAY’S ENTRY</p><h2>Daily report</h2></div><div className="report-sheet__date"><CalendarDays size={16} /><span>{new Intl.DateTimeFormat('en-NG', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</span></div></div>
         {loadingConfiguration && <div className="configuration-note"><Sparkles size={16} /> Preparing the live reporting template.</div>}
         {!loadingConfiguration && configurationError && <div className="configuration-note configuration-note--amber"><CircleHelp size={16} /> The reporting directory is temporarily unavailable. Refresh after the API is connected.</div>}
         {!loadingConfiguration && !configurationError && (!branches.length || !teamMembers.length) && <div className="configuration-note configuration-note--amber"><CircleHelp size={16} /> Your administrator will add the official branch and BDE list in Form studio before this link is shared.</div>}
         {!loadingConfiguration && !configurationError && !groupedSections.length && <div className="configuration-note configuration-note--amber"><CircleHelp size={16} /> Your administrator has not added any report questions yet.</div>}
-        <MonthlyProgress progress={monthlyProgress} />
+        <MonthlyProgress progress={monthlyProgress} progressRef={monthlyProgressRef} />
         <form onSubmit={submit} noValidate>
           <LedgerSection number="01" title="Identity" description="Tell the ledger who is submitting this entry."><Field label="Report date"><input type="date" value={form.reportDate} onChange={(event) => update('reportDate', event.target.value)} required /></Field><Field label="Branch"><LedgerPicker ariaLabel="Select branch" disabled={!branches.length} emptyLabel="No branches have been added yet." onChange={(value) => update('branchId', value)} options={branches.map((branch) => ({ value: branch._id, label: branch.name }))} placeholder="Choose branch" value={form.branchId} /></Field><Field label="BDE / ESO name"><LedgerPicker ariaLabel="Select BDE or ESO" disabled={!form.branchId || !membersForBranch.length} emptyLabel={form.branchId ? 'No BDE or ESO is listed for this branch yet.' : 'Choose a branch first.'} onChange={(value) => update('teamMemberId', value)} options={membersForBranch.map((member) => ({ value: member._id, label: member.fullName }))} placeholder={form.branchId ? 'Choose BDE / ESO' : 'Choose branch first'} value={form.teamMemberId} /></Field><div className="identity-request field--full"><div><strong>Can’t find your name?</strong><span>Send your name, branch, DAO code, and role for your manager to add.</span></div><button className="gold-link" type="button" onClick={() => setRegistrationOpen(true)}>Request access <ArrowRight size={14} /></button></div></LedgerSection>
           {groupedSections.map((section, index) => <LedgerSection key={section._id} number={String(index + 2).padStart(2, '0')} title={section.name} description={section.description}>{section.questions.map(renderQuestion)}</LedgerSection>)}
