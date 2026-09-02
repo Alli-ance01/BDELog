@@ -10,3 +10,10 @@
 - [x] Add or update automated tests for category/question ordering and configuration validation
 - [x] Run type/build/test checks and visually inspect the admin and worker flows
 - [x] Commit and push the verified implementation to Alli-ance01/BDELog
+
+- [x] Add the standard monthly target of 45 accounts opened and ₦8,000,000 mobilised
+- [x] Calculate each worker’s month-to-date totals from submitted daily reports
+- [x] Return remaining accounts and mobilisation amount after submission, including over-target values
+- [x] Render a daily-updated worker progress summary with clear target and surplus states
+- [x] Add tests for monthly aggregation, zero/negative remaining values, and over-target messaging
+- [x] Run the full validation suite and push the monthly target update to Alli-ance01/BDELog

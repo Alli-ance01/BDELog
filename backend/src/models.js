@@ -84,6 +84,7 @@ const reportSchema = new Schema({
 }, { timestamps: true });
 reportSchema.index({ reportDate: 1, teamMemberId: 1 }, { unique: true });
 reportSchema.index({ reportDate: -1, branchName: 1, teamMemberName: 1 });
+reportSchema.index({ teamMemberId: 1, reportDate: 1 });
 
 export const Admin = mongoose.model('Admin', adminSchema);
 export const Branch = mongoose.model('Branch', branchSchema);

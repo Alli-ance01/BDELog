@@ -6,6 +6,7 @@ import { Admin, Branch, DirectoryRequest, Question, QuestionCategory, Report, Te
 import { clearSessionCookie, createSession, requireAdmin, requireCsrf, requireOwner, sessionCookie } from './middleware/auth.js';
 import { exportValue, makeQuestionKey, normaliseAnswer } from './utils/normalise.js';
 import { orderTemplate } from './utils/template.js';
+import { buildMonthlyProgress, monthKey } from './utils/targets.js';
 
 const questionInputTypes = ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber'];
 const questionOption = z.union([z.string().trim().min(1).max(100), z.object({ label: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(100) })]);
@@ -45,6 +46,10 @@ function questionSequenceFilter(categoryId) { return categoryId ? { categoryId }
 function normaliseBranchPayload(payload) { return { ...payload, code: payload.code ? payload.code.trim().toUpperCase() : undefined }; }
 function toPlainAnswers(report) { return Object.fromEntries(report.answers instanceof Map ? report.answers.entries() : Object.entries(report.answers || {})); }
 function dateToday() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos' }).format(new Date()); }
+function nextMonthKey(month) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 7);
+}
 
 export const publicRouter = Router();
 publicRouter.get('/form', async (_req, res, next) => {
@@ -98,7 +103,10 @@ publicRouter.post('/reports', async (req, res, next) => {
       if (errors.length) return res.status(422).json({ message: errors[0], fieldErrors: errors });
     const categoriesById = new Map(categories.map((category) => [String(category._id), category.name]));
     const report = await Report.create({ reportDate, branchId: branch._id, branchName: branch.name, teamMemberId: teamMember._id, teamMemberName: teamMember.fullName, teamMemberDaoCode: teamMember.daoCode || '', teamMemberRole: teamMember.role || 'BDE', answers, questionSnapshot: orderedQuestions.map(({ key, label, inputType, categoryId, order }) => ({ key, label, inputType, categoryId, categoryName: categoriesById.get(String(categoryId)) || 'Uncategorised', order })) });
-    return res.status(201).json({ report: { ...report.toObject(), answers: toPlainAnswers(report) } });
+    const month = monthKey(reportDate);
+    const monthlyReports = await Report.find({ teamMemberId: teamMember._id, reportDate: { $gte: `${month}-01`, $lt: `${nextMonthKey(month)}-01` } }).lean();
+    const monthlyProgress = buildMonthlyProgress(monthlyReports, month);
+    return res.status(201).json({ report: { ...report.toObject(), answers: toPlainAnswers(report) }, monthlyProgress });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ message: 'This BDE/ESo has already submitted a report for that date.' });
     return next(error);

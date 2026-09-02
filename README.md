@@ -49,6 +49,8 @@ npm run migrate:categories
 
 The Form Studio now stores categories with names, descriptions, display order, and active state. Questions carry a category assignment, position within that category, complete field configuration, and an active/retired state. The public report form reads the same configuration and renders the worker flow in category order, then question order.
 
+Every BDE/ESo has the standard monthly minimum of **45 accounts opened** and **₦8,000,000 mobilised**. A successful daily report response includes the selected worker’s month-to-date totals for the report month, the remaining account and mobilisation balances, and any surplus after a target is exceeded. The worker form keeps this monthly pace card visible after submission and starts a fresh daily form for the next entry. The aggregation is based on submitted reports for the selected worker and uses the report date’s `YYYY-MM` month boundary.
+
 Then sign in, add your branches and BDE/ESo team list, and share the public reporting URL. Do not share the public form before its branch and team lists have been configured.
 
 ## Deploying

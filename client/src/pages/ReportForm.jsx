@@ -28,12 +28,26 @@ function Field({ label, hint, children, className = '' }) {
   return <label className={`field ${className}`}><span className="field__label">{label}</span>{children}{hint && <span className="field__hint">{hint}</span>}</label>;
 }
 
+function MonthlyProgress({ progress }) {
+  if (!progress) return null;
+  const metric = (key, label, formatter) => {
+    const value = progress[key];
+    const percentage = Math.min(100, Math.round((value.achieved / value.target) * 100));
+    const surplus = value.surplus > 0;
+    const displayLabel = surplus ? `${label} above target` : label;
+    const displayValue = surplus ? `+${formatter(value.surplus)}` : formatter(value.remaining);
+    return <article className={surplus ? 'monthly-progress__metric is-surplus' : value.reached ? 'monthly-progress__metric is-complete' : 'monthly-progress__metric'}><div className="monthly-progress__metric-heading"><span>{displayLabel}</span><strong>{displayValue}</strong></div><p>{surplus ? 'Monthly target exceeded' : value.reached ? 'Target reached' : `${formatter(value.remaining)} left this month`}</p><div className="monthly-progress__bar"><span style={{ width: `${percentage}%` }} /></div><small>{formatter(value.achieved)} of {formatter(value.target)} achieved</small></article>;
+  };
+  return <section className="monthly-progress" aria-live="polite"><div className="monthly-progress__heading"><div><p className="eyebrow">MONTHLY PACE / {progress.month}</p><h3>Your position this month</h3><p>Today’s approved report is now included. Your remaining balance updates after every daily submission.</p></div><div className="monthly-progress__stamp"><Sparkles size={15} /> Live ledger</div></div><div className="monthly-progress__metrics">{metric('accountsOpened', 'Accounts to open', (value) => `${value}`)}{metric('amountMobilised', 'Mobilisation to go', formatNaira)}</div></section>;
+}
+
 export default function ReportForm() {
   const [form, setForm] = useState(initialForm);
   const [configuration, setConfiguration] = useState(emptyConfiguration);
   const [loadingConfiguration, setLoadingConfiguration] = useState(true);
   const [configurationError, setConfigurationError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [monthlyProgress, setMonthlyProgress] = useState(null);
   const [accountNumberEntry, setAccountNumberEntry] = useState({});
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [registrationSubmitting, setRegistrationSubmitting] = useState(false);
@@ -113,7 +127,8 @@ export default function ReportForm() {
     event.preventDefault();
     setSubmitting(true);
     try {
-      await api('/public/reports', { method: 'POST', body: JSON.stringify(form) });
+      const result = await api('/public/reports', { method: 'POST', body: JSON.stringify(form) });
+      setMonthlyProgress(result.monthlyProgress || null);
       toast.success('Report submitted and added to the ledger.');
       setForm({ ...initialForm, reportDate: new Date().toISOString().slice(0, 10) });
       setAccountNumberEntry({});
@@ -149,6 +164,7 @@ export default function ReportForm() {
         {!loadingConfiguration && configurationError && <div className="configuration-note configuration-note--amber"><CircleHelp size={16} /> The reporting directory is temporarily unavailable. Refresh after the API is connected.</div>}
         {!loadingConfiguration && !configurationError && (!branches.length || !teamMembers.length) && <div className="configuration-note configuration-note--amber"><CircleHelp size={16} /> Your administrator will add the official branch and BDE list in Form studio before this link is shared.</div>}
         {!loadingConfiguration && !configurationError && !groupedSections.length && <div className="configuration-note configuration-note--amber"><CircleHelp size={16} /> Your administrator has not added any report questions yet.</div>}
+        <MonthlyProgress progress={monthlyProgress} />
         <form onSubmit={submit} noValidate>
           <LedgerSection number="01" title="Identity" description="Tell the ledger who is submitting this entry."><Field label="Report date"><input type="date" value={form.reportDate} onChange={(event) => update('reportDate', event.target.value)} required /></Field><Field label="Branch"><LedgerPicker ariaLabel="Select branch" disabled={!branches.length} emptyLabel="No branches have been added yet." onChange={(value) => update('branchId', value)} options={branches.map((branch) => ({ value: branch._id, label: branch.name }))} placeholder="Choose branch" value={form.branchId} /></Field><Field label="BDE / ESO name"><LedgerPicker ariaLabel="Select BDE or ESO" disabled={!form.branchId || !membersForBranch.length} emptyLabel={form.branchId ? 'No BDE or ESO is listed for this branch yet.' : 'Choose a branch first.'} onChange={(value) => update('teamMemberId', value)} options={membersForBranch.map((member) => ({ value: member._id, label: member.fullName }))} placeholder={form.branchId ? 'Choose BDE / ESO' : 'Choose branch first'} value={form.teamMemberId} /></Field><div className="identity-request field--full"><div><strong>Can’t find your name?</strong><span>Send your name, branch, DAO code, and role for your manager to add.</span></div><button className="gold-link" type="button" onClick={() => setRegistrationOpen(true)}>Request access <ArrowRight size={14} /></button></div></LedgerSection>
           {groupedSections.map((section, index) => <LedgerSection key={section._id} number={String(index + 2).padStart(2, '0')} title={section.name} description={section.description}>{section.questions.map(renderQuestion)}</LedgerSection>)}

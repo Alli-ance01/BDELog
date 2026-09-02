@@ -5,3 +5,15 @@
 - Admin `/admin/questions` rendered the persistent sidebar, FORM STUDIO header, Category and Question actions, template architecture callout, and API error/retry state cleanly.
 - Vite required `server.allowedHosts: true` for the temporary exposed preview host used during this local browser pass.
 The browser console remained clear during the preview pass; no client-side exceptions or module-load failures appeared.
+For monthly target verification, a temporary API fixture loaded the worker shell and the page rendered the expected configuration-preparation state. The initial branch interaction was attempted while the fixture response was still settling; the follow-up browser state should be checked before drawing conclusions about controls.
+The fixture-backed worker form loaded successfully and visibly rendered the configured Daily performance and Pipeline and support categories, including the Accounts opened today, Amount mobilised today, and conditional-capable cluster question controls.
+The fixture-backed smoke test successfully loaded the category sections. Selecting the Lagos Central branch worked and exposed the BDE/ESO picker as expected.
+The fixture-backed smoke test successfully selected both the Lagos Central branch and Ada Okafor, leaving the configured daily performance fields ready for entry.
+The first sample submission attempt reached the client but the temporary API endpoint was not yet exposed, so the expected connection error appeared. The client retained the entered values and did not lose the form state. The fixture API has since been exposed for a retry.
+The retried fixture-backed preview loaded with the expected categories, and the branch picker opened with Lagos Central available for selection.
+The final fixture-backed smoke test opened the BDE/ESO picker after branch selection, with Ada Okafor available as the expected worker option.
+The final smoke test entered 3 accounts opened and ₦300,000 mobilisation against the loaded worker identity and category form, matching the requested example values.
+After restarting the corrected fixture, the worker preview opened the branch list successfully and displayed Lagos Central as the available branch.
+The corrected fixture-backed flow opens the worker picker after branch selection and presents Ada Okafor as the available worker option.
+The corrected fixture-backed flow selected Ada Okafor and accepted the sample daily totals of 3 accounts and ₦300,000 without client validation errors.
+The corrected fixture-backed submission succeeded. The worker page displayed “Your position this month” with 42 accounts left from the 45-account target and ₦7,700,000 left from the ₦8,000,000 mobilisation target, alongside the achieved values of 3 and ₦300,000. The form reset for the next daily report while the monthly summary remained visible.
