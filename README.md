@@ -58,3 +58,7 @@ Then sign in, add your branches and BDE/ESo team list, and share the public repo
 Deploy the `backend/` directory to Render with the supplied [`backend/render.yaml`](backend/render.yaml) configuration, then deploy the repository root to Vercel. Add the Render `/api` URL as `VITE_API_BASE_URL` in Vercel and set `CLIENT_ORIGIN` in Render to the final Vercel custom domain.
 
 For reliable administrator session cookies, map both the frontend and API under `alliancedev.online`—for example `bdelog.alliancedev.online` and `api.bdelog.alliancedev.online`—before setting `COOKIE_DOMAIN=.alliancedev.online`.
+
+## SEO and Google indexing
+
+The public BDELog page includes a search-focused title and description, Open Graph and Twitter metadata, WebApplication structured data, a canonical URL, `robots.txt`, and `sitemap.xml`. The current crawler files use `https://bdelog.manus.space/` as the expected public address; replace that host in `client/index.html`, `client/public/robots.txt`, and `client/public/sitemap.xml` if the deployed app uses another domain. After deployment, verify the public URL in Google Search Console, submit the sitemap, and request indexing for the home page. Search ranking for a broad query such as “BDE” depends on Google’s crawl, the final domain, page content, links, and competition; metadata makes the page eligible and understandable but does not guarantee a particular position.

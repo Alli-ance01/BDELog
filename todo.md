@@ -28,3 +28,10 @@
 - [x] Move focus to the result and provide a clear post-submission announcement without requiring upward scrolling
 - [x] Verify the announcement and focus behavior on desktop and responsive mobile layouts
 - [x] Run the full validation suite and push the post-submission visibility fix to Alli-ance01/BDELog
+
+- [x] Add descriptive SEO title, description, keywords, canonical, and social metadata for the public BDELog page
+- [x] Add robots.txt and sitemap.xml for crawler discovery
+- [x] Add safe structured data describing BDELog as a daily reporting web application
+- [x] Verify metadata, crawl files, and production build behavior
+- [x] Document Google Search Console submission and deployment URL follow-up
+- [x] Push the SEO update to Alli-ance01/BDELog
