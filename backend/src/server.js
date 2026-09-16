@@ -5,6 +5,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
+import { Question } from './models.js';
 import { adminRouter, appErrorHandler, authRouter, publicRouter } from './routes.js';
 
 const required = ['MONGODB_URI', 'JWT_SECRET', 'CLIENT_ORIGIN'];
@@ -29,4 +30,17 @@ app.use('/api/admin', adminRouter);
 app.use(appErrorHandler);
 
 const port = Number(process.env.PORT || 5000);
-mongoose.connect(process.env.MONGODB_URI).then(() => app.listen(port, () => console.log(`BDELog API listening on ${port}`))).catch((error) => { console.error('MongoDB connection failed:', error); process.exit(1); });
+async function migrateAccountDetailsQuestion() {
+  const legacyQuestion = await Question.findOne({ key: 'accountNumber' });
+  if (!legacyQuestion || legacyQuestion.inputType === 'accountDetails') return;
+  legacyQuestion.label = 'Opened account details';
+  legacyQuestion.inputType = 'accountDetails';
+  legacyQuestion.helpText = 'Enter the account holder name and exactly 10-digit account number for each account opened today.';
+  await legacyQuestion.save();
+  console.log('Migrated accountNumber to the count-linked account details field.');
+}
+
+mongoose.connect(process.env.MONGODB_URI).then(async () => {
+  await migrateAccountDetailsQuestion();
+  app.listen(port, () => console.log(`BDELog API listening on ${port}`));
+}).catch((error) => { console.error('MongoDB connection failed:', error); process.exit(1); });
