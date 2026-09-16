@@ -52,6 +52,14 @@ export function normaliseAnswer(question, value) {
     if (new Set(result).size !== result.length) return { error: 'Each account number can be entered only once per report.' };
     return { value: result };
   }
+  if (question.inputType === 'accountDetails') {
+    if (!Array.isArray(value)) return { error: `${question.label} must contain account entries.` };
+    const result = value.map((entry) => ({ name: String(entry?.name || '').trim().replace(/\s+/g, ' '), accountNumber: String(entry?.accountNumber || '').replace(/\s/g, '') }));
+    if (result.some((entry) => entry.name.length < 2)) return { error: 'Enter the account holder name for every opened account.' };
+    if (result.some((entry) => !/^\d{10}$/.test(entry.accountNumber))) return { error: 'Each account number must contain exactly 10 digits.' };
+    if (new Set(result.map((entry) => entry.accountNumber)).size !== result.length) return { error: 'Each account number can be entered only once per report.' };
+    return { value: result };
+  }
   if (question.inputType === 'boolean') {
     if (value === true || value === 'Yes') return { value: true };
     if (value === false || value === 'No') return { value: false };
@@ -82,5 +90,6 @@ export function exportValue(question, value) {
   if (question.inputType === 'currency') return `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   if (question.inputType === 'boolean') return value ? 'Yes' : 'No';
   if (question.inputType === 'accountNumber' && Array.isArray(value)) return value.join(' | ');
+  if (question.inputType === 'accountDetails' && Array.isArray(value)) return value.map((entry, index) => `${index + 1}. ${entry.name} — ${entry.accountNumber}`).join(' | ');
   return value;
 }

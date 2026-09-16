@@ -59,7 +59,7 @@ const questionSchema = new Schema({
   key: { type: String, required: true, unique: true, immutable: true, trim: true, maxlength: 80 },
   label: { type: String, required: true, trim: true, maxlength: 180 },
   helpText: { type: String, trim: true, maxlength: 300, default: '' },
-  inputType: { type: String, required: true, enum: ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber'] },
+  inputType: { type: String, required: true, enum: ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber', 'accountDetails'] },
   options: { type: [optionSchema], default: [] },
   validation: { type: validationSchema, default: {} },
   showWhen: { type: conditionSchema, default: null },

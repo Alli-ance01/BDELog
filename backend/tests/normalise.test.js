@@ -24,6 +24,13 @@ test('account numbers keep leading zeros as unique, exactly ten-digit canonical 
   assert.ok(normaliseAnswer(question, ['12345678901']).error);
 });
 
+test('account details preserve names, leading zeros, and unique ten-digit numbers', () => {
+  const question = { label: 'Opened account details', inputType: 'accountDetails' };
+  assert.deepEqual(normaliseAnswer(question, [{ name: '  Ada   Okafor ', accountNumber: '0012345678' }]), { value: [{ name: 'Ada Okafor', accountNumber: '0012345678' }] });
+  assert.ok(normaliseAnswer(question, [{ name: 'A', accountNumber: '0012345678' }]).error);
+  assert.ok(normaliseAnswer(question, [{ name: 'Ada Okafor', accountNumber: '0012345678' }, { name: 'Bola Musa', accountNumber: '0012345678' }]).error);
+});
+
 test('binary and pace controls accept only their canonical values', () => {
   assert.deepEqual(normaliseAnswer({ label: 'Need help', inputType: 'boolean' }, 'Yes'), { value: true });
   assert.deepEqual(normaliseAnswer({ label: 'Pace', inputType: 'paceRating' }, 'Sterling'), { value: 'Sterling' });

@@ -17,6 +17,7 @@ const typeLabels = {
   boolean: 'Yes / No',
   paceRating: 'Pace rating',
   accountNumber: 'Account number',
+  accountDetails: 'Account name + number list',
 };
 const inputTypeOptions = Object.entries(typeLabels).map(([value, label]) => ({ value, label }));
 const roleOptions = [{ value: 'BDE', label: 'BDE' }, { value: 'ESO', label: 'ESO' }];

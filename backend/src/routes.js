@@ -8,7 +8,7 @@ import { exportValue, makeQuestionKey, normaliseAnswer } from './utils/normalise
 import { orderTemplate } from './utils/template.js';
 import { buildMonthlyProgress, monthKey } from './utils/targets.js';
 
-const questionInputTypes = ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber'];
+const questionInputTypes = ['text', 'textarea', 'integer', 'currency', 'date', 'select', 'boolean', 'paceRating', 'accountNumber', 'accountDetails'];
 const questionOption = z.union([z.string().trim().min(1).max(100), z.object({ label: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(100) })]);
 const questionValidation = z.object({
   min: z.number().finite().optional(),
@@ -99,6 +99,14 @@ publicRouter.post('/reports', async (req, res, next) => {
       if (question.required && (result.value === null || result.value === '')) errors.push(`${question.label} is required.`);
       else if (result.error) errors.push(result.error);
         else if (result.value !== null) answers[question.key] = result.value;
+      }
+      const accountDetailsQuestion = orderedQuestions.find((question) => question.inputType === 'accountDetails');
+      if (!errors.length && accountDetailsQuestion) {
+        const expectedCount = Number(sourceAnswers.accountsOpened);
+        const details = answers[accountDetailsQuestion.key];
+        if (Number.isSafeInteger(expectedCount) && expectedCount >= 0 && (!Array.isArray(details) || details.length !== expectedCount)) {
+          errors.push(`${accountDetailsQuestion.label} must contain exactly ${expectedCount} entr${expectedCount === 1 ? 'y' : 'ies'} to match Accounts opened today.`);
+        }
       }
       if (errors.length) return res.status(422).json({ message: errors[0], fieldErrors: errors });
     const categoriesById = new Map(categories.map((category) => [String(category._id), category.name]));

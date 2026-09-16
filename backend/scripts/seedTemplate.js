@@ -14,7 +14,7 @@ const template = [
   ['alternateChannels', 'Alternate channels issued', 'integer', true, 'Whole number only', 'Daily performance'],
   ['cumulativeOpeningBalance', 'Cumulative opening balance', 'currency', true, 'Enter a Naira amount', 'Daily performance'],
   ['amountMobilised', 'Amount mobilised today', 'currency', true, 'Enter a Naira amount', 'Daily performance'],
-  ['accountNumber', 'Account number', 'accountNumber', false, 'Leading zeros are preserved', 'Daily performance'],
+  ['accountNumber', 'Opened account details', 'accountDetails', false, 'Enter the account holder name and exactly 10-digit account number for each account opened today.', 'Daily performance'],
   ['funded', 'How many funded?', 'integer', true, 'Whole number only', 'Daily performance'],
   ['carded', 'How many carded?', 'integer', true, 'Whole number only', 'Daily performance'],
   ['plannedClosures', 'How many do you intend to close this week?', 'integer', true, 'Whole number only', 'Pipeline and support'],
