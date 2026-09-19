@@ -89,7 +89,7 @@ export function exportValue(question, value) {
   if (value === null || value === undefined) return '';
   if (question.inputType === 'currency') return `₦${Number(value).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   if (question.inputType === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value) && value.every((entry) => entry && typeof entry === 'object' && 'accountNumber' in entry)) return value.map((entry, index) => `${index + 1}. ${entry.name || 'Unnamed'} — ${entry.accountNumber}`).join(' | ');
   if (question.inputType === 'accountNumber' && Array.isArray(value)) return value.join(' | ');
-  if (question.inputType === 'accountDetails' && Array.isArray(value)) return value.map((entry, index) => `${index + 1}. ${entry.name} — ${entry.accountNumber}`).join(' | ');
   return value;
 }

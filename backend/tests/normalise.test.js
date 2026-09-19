@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normaliseAnswer, parseCurrency } from '../src/utils/normalise.js';
+import { exportValue, normaliseAnswer, parseCurrency } from '../src/utils/normalise.js';
 
 test('currency values resolve to one canonical numeric amount', () => {
   assert.equal(parseCurrency('#1,000,000'), 1000000);
@@ -29,6 +29,12 @@ test('account details preserve names, leading zeros, and unique ten-digit number
   assert.deepEqual(normaliseAnswer(question, [{ name: '  Ada   Okafor ', accountNumber: '0012345678' }]), { value: [{ name: 'Ada Okafor', accountNumber: '0012345678' }] });
   assert.ok(normaliseAnswer(question, [{ name: 'A', accountNumber: '0012345678' }]).error);
   assert.ok(normaliseAnswer(question, [{ name: 'Ada Okafor', accountNumber: '0012345678' }, { name: 'Bola Musa', accountNumber: '0012345678' }]).error);
+});
+
+test('exports account detail objects as readable account entries instead of object strings', () => {
+  const value = [{ name: 'Ada Okafor', accountNumber: '0012345678' }, { name: 'Bola Musa', accountNumber: '9988776655' }];
+  assert.equal(exportValue({ inputType: 'accountDetails' }, value), '1. Ada Okafor — 0012345678 | 2. Bola Musa — 9988776655');
+  assert.equal(exportValue({ inputType: 'accountNumber' }, value), '1. Ada Okafor — 0012345678 | 2. Bola Musa — 9988776655');
 });
 
 test('binary and pace controls accept only their canonical values', () => {
