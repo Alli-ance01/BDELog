@@ -50,6 +50,15 @@ function nextMonthKey(month) {
   const [year, monthNumber] = month.split('-').map(Number);
   return new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 7);
 }
+function summariseReports(reports, activeBranches = 0) {
+  return reports.reduce((summary, report) => {
+    const answers = toPlainAnswers(report);
+    summary.submitted += 1;
+    summary.accountsOpened += Number(answers.accountsOpened || 0);
+    summary.amountMobilised += Number(answers.amountMobilised || 0);
+    return summary;
+  }, { submitted: 0, accountsOpened: 0, amountMobilised: 0, activeBranches });
+}
 
 export const publicRouter = Router();
 publicRouter.get('/form', async (_req, res, next) => {
@@ -143,11 +152,34 @@ adminRouter.post('/admins', requireOwner, requireCsrf, async (req, res, next) =>
 adminRouter.put('/admins/:id', requireOwner, requireCsrf, async (req, res, next) => { try { const payload = adminUpdatePayload.parse(req.body); const admin = await Admin.findByIdAndUpdate(req.params.id, { displayName: payload.displayName, email: payload.email.toLowerCase() }, { new: true, runValidators: true }).select('displayName email role isActive createdAt updatedAt'); if (!admin) return res.status(404).json({ message: 'Administrator not found.' }); return res.json({ admin: { ...admin.toObject(), role: admin.role || 'admin' } }); } catch (error) { return next(error); } });
 adminRouter.post('/admins/:id/reset-password', requireOwner, requireCsrf, async (req, res, next) => { try { const { password } = passwordResetPayload.parse(req.body); const admin = await Admin.findByIdAndUpdate(req.params.id, { passwordHash: await bcrypt.hash(password, 12) }, { new: true }); if (!admin) return res.status(404).json({ message: 'Administrator not found.' }); return res.json({ success: true }); } catch (error) { return next(error); } });
 adminRouter.post('/admins/:id/status', requireOwner, requireCsrf, async (req, res, next) => { try { const { isActive } = adminStatusPayload.parse(req.body); if (req.params.id === req.admin.sub && !isActive) return res.status(422).json({ message: 'You cannot deactivate your own account.' }); const target = await Admin.findById(req.params.id); if (!target) return res.status(404).json({ message: 'Administrator not found.' }); if (!isActive && target.role === 'owner') { const otherOwners = await Admin.countDocuments({ role: 'owner', isActive: true, _id: { $ne: target._id } }); if (!otherOwners) return res.status(422).json({ message: 'BDELog must retain at least one active owner.' }); } target.isActive = isActive; await target.save(); return res.json({ admin: { id: target._id, displayName: target.displayName, email: target.email, role: target.role || 'admin', isActive: target.isActive } }); } catch (error) { return next(error); } });
-adminRouter.get('/dashboard', async (_req, res, next) => {
+adminRouter.get('/dashboard', async (req, res, next) => {
   try {
     const today = dateToday();
-    const [todayReports, activeBranches, latestReports] = await Promise.all([Report.find({ reportDate: today }).lean(), Branch.countDocuments({ isActive: true }), Report.find().sort({ reportDate: -1, createdAt: -1 }).limit(8).lean()]);
-    const summary = todayReports.reduce((result, report) => { const answers = toPlainAnswers(report); result.accountsOpened += Number(answers.accountsOpened || 0); result.amountMobilised += Number(answers.amountMobilised || 0); return result; }, { submittedToday: todayReports.length, accountsOpened: 0, amountMobilised: 0, activeBranches });
+    const month = today.slice(0, 7);
+    const monthStart = `${month}-01`;
+    const monthEnd = `${nextMonthKey(month)}-01`;
+    const monthLastDay = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).toISOString().slice(0, 10);
+    const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+    const requestedFrom = validDate(req.query.from) ? req.query.from : monthStart;
+    const requestedTo = validDate(req.query.to) ? req.query.to : today;
+    const rangeFrom = requestedFrom <= requestedTo ? requestedFrom : requestedTo;
+    const rangeTo = requestedFrom <= requestedTo ? requestedTo : requestedFrom;
+    const [todayReports, monthReports, rangeReports, activeBranches, latestReports] = await Promise.all([
+      Report.find({ reportDate: today }).lean(),
+      Report.find({ reportDate: { $gte: monthStart, $lt: monthEnd } }).lean(),
+      Report.find({ reportDate: { $gte: rangeFrom, $lte: rangeTo } }).lean(),
+      Branch.countDocuments({ isActive: true }),
+      Report.find().sort({ reportDate: -1, createdAt: -1 }).limit(8).lean(),
+    ]);
+    const todaySummary = summariseReports(todayReports, activeBranches);
+    const summary = {
+      submittedToday: todaySummary.submitted,
+      accountsOpened: todaySummary.accountsOpened,
+      amountMobilised: todaySummary.amountMobilised,
+      activeBranches,
+      month: { from: monthStart, to: monthLastDay, ...summariseReports(monthReports) },
+      range: { from: rangeFrom, to: rangeTo, ...summariseReports(rangeReports) },
+    };
     res.json({ summary, latestReports: latestReports.map((report) => ({ ...report, answers: toPlainAnswers(report) })) });
   } catch (error) { next(error); }
 });

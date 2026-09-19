@@ -353,3 +353,22 @@ textarea { resize: vertical; min-height: 88px; }
   .submission-notice__view { flex: 1 1 auto; margin-left: 43px; }
   .submission-notice__close { margin-left: auto; }
 }
+
+/* Live overview and period summaries */
+.live-indicator { align-items: center; color: var(--muted); display: inline-flex; font-size: 10px; font-weight: 800; gap: 6px; letter-spacing: .04em; white-space: nowrap; }
+.live-indicator i { background: #4d9a72; border-radius: 50%; box-shadow: 0 0 0 3px rgba(77,154,114,.14); display: block; height: 7px; width: 7px; }
+.period-filter { align-items: end; background: #eeece4; display: flex; gap: 28px; justify-content: space-between; margin: 30px 0 20px; padding: 22px 24px; }
+.period-filter h2 { font-family: 'DM Serif Display', serif; font-size: 29px; font-weight: 400; letter-spacing: -.04em; margin: 0; }
+.period-filter p:not(.eyebrow) { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 7px 0 0; max-width: 470px; }
+.period-filter form { align-items: end; display: flex; gap: 8px; }
+.period-filter label, .period-filter label span { display: block; }
+.period-filter label span { color: var(--muted); font-size: 10px; font-weight: 800; margin: 0 0 6px; }
+.period-filter input { min-width: 145px; padding: 11px 10px; }
+.period-filter .primary-button { min-height: 44px; }
+.period-totals { border-bottom: 1px solid var(--line); padding: 24px 0 28px; }
+.period-totals .section-heading { margin-bottom: 18px; }
+.period-totals .section-heading h2 { font-size: 29px; }
+.overview-stats--period { margin: 0; }
+.overview-stats--period .stat { min-height: 112px; }
+@media (max-width: 900px) { .period-filter { align-items: stretch; flex-direction: column; gap: 18px; }.period-filter form { flex-wrap: wrap; }.period-filter form label { flex: 1 1 150px; }.period-filter form .primary-button { flex: 1 1 100%; } }
+@media (max-width: 620px) { .admin-header__actions .live-indicator { display: none; }.period-filter { padding: 18px; }.period-filter form { display: grid; grid-template-columns: 1fr 1fr; }.period-filter form label { min-width: 0; }.period-filter form .primary-button { grid-column: 1 / -1; }.period-filter input { min-width: 0; }.period-totals .section-heading { align-items: flex-start; flex-direction: column; gap: 8px; }.overview-stats--period { grid-template-columns: 1fr; } }
